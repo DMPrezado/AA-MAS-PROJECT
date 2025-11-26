@@ -1,3 +1,20 @@
+Problemas a resolver:
+    -quando faz moove, tem de atualizar a lista das posições ocupadas no Ambiente
+    -criar o agente tem de ser depois dos obstáculos (ou seja, o ambiente já existe) para se usar a função freePositions
+    -coordenada inicial do agente: Como resolver o facto de não conseguiromos saber que posições estão livres?  
+
+
+
+
+implementar 2 modos 
+    -aprendizagem
+        .Q-learning
+        .Genético
+    -teste
+        .politica fixa
+
+
+
 Ambient
     Attributes:
         - agents: list[Agent]
@@ -9,7 +26,7 @@ Ambient
 #       - freePositions() -> list[Coord]
         - getLightHouse() -> LightHouse
         - getAgentsList() -> list[Agent]
-#       -render() -> str (render)
+#       - render() -> str (render)
 
 Agent
     Attributes:
