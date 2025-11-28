@@ -39,18 +39,30 @@ class Ambiente:
         return self.agents
     
     def render(self):
-        # Returns a string representation of the environment
-        grid = [['.' for _ in range(self.grid_size[0])] for _ in range(self.grid_size[1])]
-        
+        width, height = self.grid_size
+
+        # cria grelha vazia
+        grid = [['.' for _ in range(width)] for _ in range(height)]
+
+        # desenhar obstáculos
         for obstacle in self.obstacles:
             coord = obstacle.getCoord()
-            grid[coord.y][coord.x] = '#'
-        
-        lighthouse_coord = self.lighthouse.getCoord()
-        grid[lighthouse_coord.y][lighthouse_coord.x] = 'L'
-        
+            x, y = coord.getX(), coord.getY()
+            if 0 <= x < width and 0 <= y < height:
+                grid[y][x] = '#'
+
+        # desenhar farol
+        lh_coord = self.lighthouse.getCoord()
+        x, y = lh_coord.getX(), lh_coord.getY()
+        if 0 <= x < width and 0 <= y < height:
+            grid[y][x] = 'L'
+
+        # desenhar agentes
         for agent in self.agents:
-            coord = agent.getCoord()
-            grid[coord.y][coord.x] = 'A'
-        
+            coord = agent.coord      # usa o atributo que já tens
+            x, y = coord.getX(), coord.getY()
+            if 0 <= x < width and 0 <= y < height:
+                grid[y][x] = 'A'
+
+        # junta tudo numa string
         return '\n'.join(' '.join(row) for row in grid)
