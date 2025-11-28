@@ -8,10 +8,10 @@
 #     coord : Coord
 #     finished_flag : Boolean
 # Methods:
-#  Raul :(  move(Coord) : Void
-#   :)  finished() : Void
-#   :(  nextMove(freePositions): Void
-#  David :(  getLightHouseDirection : Vector
+#  Raul     :(  move(Coord) : Void
+#           :)  finished() : Void
+#  David    :(  nextMove(freePositions): Void  (Já não vai haver freePositions como argumento)
+#  David    :(  getLightHouseDirection : Vector
 
 
 
@@ -19,11 +19,13 @@ from random import random
 
 
 class Agent:
-    def __init__(self, name, freePositions):
+    def __init__(self, name, ambient):
         self.name = name
         self.finished_flag = False
-        self.coord = freePositions.pop(random.randint(0, len(freePositions)-1))
-
+        self.ambient = ambient
+        freePositions = self.ambient.freePositions()
+        self.coord = freePositions[random.randint(0, len(freePositions)-1)]
+        self.ambient.occupiedPositions.add(self.coord)
     
     def move(self, coord):
         ##Por fazer
@@ -34,8 +36,7 @@ class Agent:
 
     def nextMove(self, freePositions):
         # Placeholder for movement logic
-        if freePositions:
-            self.move(freePositions[0])  # Move to the first free position
+        return #placeholder
 
     def getLightHouseDirection(self, lighthouse):
         direction_x = lighthouse.x - self.x

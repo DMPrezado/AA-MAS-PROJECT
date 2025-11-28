@@ -5,31 +5,35 @@
 #         - lighthouse: LightHouse
 #         - grid_size (or bounds): tuple[int,int] / whatever represents limits
 #     Methods:
-#  David  :(   - freePositions() -> list[Coord]
-#    :)   - getLightHouse() -> LightHouse
-#    :)   - getAgentsList() -> list[Agent]
-#  Manuel  :(   - render() -> str (render)
+#  David    :)   - freePositions() -> list[Coord]
+#           :)   - getLightHouse() -> LightHouse
+#           :)   - getAgentsList() -> list[Agent]
+#  Manuel   :(   - render() -> str (render)
 
 
 import Coord
 
 
-class Ambiente:
+class Ambient:
     def __init__(self, agents, obstacles, lighthouse, grid_size):
         self.agents = agents  # list of Agent objects
         self.obstacles = obstacles  # list of Obstacle objects
         self.lighthouse = lighthouse  # LightHouse object
         self.grid_size = grid_size  # tuple (width, height)
+        self.occupiedPositions = set()
+        for agent in agents:
+            self.occupiedPositions.add(agent.getCoord().as_tuple())
+        for obstacle in obstacles:
+            self.occupiedPositions.add(obstacle.getCoord().as_tuple())
+        self.occupiedPositions.add(lighthouse.getCoord().as_tuple())
 
     def freePositions(self):
         # Returns a list of free positions (Coord objects) in the environment
         free_positions = []
         for x in range(self.grid_size[0]):
             for y in range(self.grid_size[1]):
-                coord = Coord(x, y)
-                ########
-                # TODO: verificar se a posiçao está ocupada por um agente, obstáculo ou farol
-                ########
+                if (x, y) not in self.occupiedPositions:
+                    free_positions.append(Coord.Coord(x, y))
         return free_positions
 
     def getLightHouse(self):
