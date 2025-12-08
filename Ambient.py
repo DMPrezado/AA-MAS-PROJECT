@@ -11,6 +11,9 @@
 #  Manuel   :(   - render() -> str (render)
 
 
+
+#criar um ambiente com os devidos objetos através de um ficheiro txt
+
 import Coord
 
 
