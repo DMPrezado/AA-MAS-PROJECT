@@ -21,8 +21,10 @@
 #                   moveTo(Coord) : Void    ##recebe uma reward pelo movimento executado
 
 
+import math
 import pygad
 import random
+import Coord
 
 class Agent:
     def __init__(self, name, ambient):
@@ -35,7 +37,117 @@ class Agent:
 
     def executar(self):
         sensorDataFront = self.sensorFront()
+        sensorDataBack = self.sensorBack()
+        sensorDataLeft = self.sensorLeft()
+        sensorDataRight = self.sensorRight()
+        sensorDataDirection = self.sensorDirection()
+        moveCoord = self.movementChoice(sensorDataFront, sensorDataBack, sensorDataLeft, sensorDataRight, sensorDataDirection)
+        self.moveTo(moveCoord)
+
 
 
     def sensorFront(self):
+        result = (0, None)
+        direction = self.whereIsFront
+        while True:
+            sensorCoord = self.coord + direction
+            if sensorCoord in self.freePositions:
+                result._1 += 1
+            else:
+                result._2 = self.ambient.getObject(sensorCoord).type
+                break
+        return result
         
+    def sensorBack(self):
+        result = (0, None)
+        direction = (self.whereIsFront[0] * -1, self.whereIsFront[1] * -1)
+        while True:
+            sensorCoord = self.coord + direction
+            if sensorCoord in self.freePositions:
+                result._1 += 1
+            else:
+                result._2 = self.ambient.getObject(sensorCoord).type
+                break
+        return result
+        
+    def sensorLeft(self):
+        result = (0, None)
+        direction = (-self.whereIsFront[1], self.whereIsFront[0])
+        while True:
+            sensorCoord = self.coord + direction
+            if sensorCoord in self.freePositions:
+                result._1 += 1
+            else:
+                result._2 = self.ambient.getObject(sensorCoord).type
+                break
+        return result
+    
+    def sensorRight(self):
+        result = (0, None)
+        direction = (self.whereIsFront[1], -self.whereIsFront[0])
+        while True:
+            sensorCoord = self.coord + direction
+            if sensorCoord in self.freePositions:
+                result._1 += 1
+            else:
+                result._2 = self.ambient.getObject(sensorCoord).type
+                break
+        return result
+    
+
+    def sensorDirection(self):
+        ax, ay = self.coord
+        lx, ly = self.ambient.getLightHouse().getCoord()
+        return math.degrees(math.atan2(ly - ay, lx - ax))
+
+    def movementChoice(self, sensorDataFront, sensorDataBack, sensorDataLeft, sensorDataRight, sensorDataDirection):
+        # Placeholder for movement choice logic using sensor data
+        # This should interface with a learning algorithm to decide the next move
+        #
+        #
+        #
+        #
+
+
+        possibleMoves = [
+            Coord.Coord(self.coord.x + 1, self.coord.y),  # Move Right
+            Coord.Coord(self.coord.x - 1, self.coord.y),  # Move Left
+            Coord.Coord(self.coord.x, self.coord.y + 1),  # Move Down
+            Coord.Coord(self.coord.x, self.coord.y - 1)   # Move Up
+        ]
+        # Filter possible moves to only include free positions
+        freeMoves = [move for move in possibleMoves if move in self.ambient.freePositions()]
+        if freeMoves:
+            return random.choice(freeMoves)
+        else:
+            return self.coord  # No move possible, stay in place
+
+    def moveTo(self, newCoord):
+        oldCoord = self.coord
+        if newCoord in self.ambient.freePositions():
+            self.ambient.occupiedPositions.remove(self.coord.as_tuple())
+            self.coord = newCoord
+            self.ambient.occupiedPositions.add(self.coord.as_tuple())
+            self.updateFitness(newCoord, oldCoord)
+        else:
+            objectType = self.ambient.getObject(newCoord)
+            if objectType == 'Wall':
+                self.fitness -= 20  # Penalize for hitting an obstacle
+            elif objectType == 'Fireplace':
+                self.fitness -= 10  # Penalize for colliding with another agent
+            elif objectType == 'Limit':
+                self.fitness -= 25
+            # Penalize for invalid move
+        
+    def getLightHouseDistance(self):
+        ax, ay = self.coord.x, self.coord.y
+        lx, ly = self.ambient.getLightHouse().getCoord().x, self.ambient.getLightHouse().getCoord().y
+        return math.sqrt((lx - ax) ** 2 + (ly - ay) ** 2)
+    
+    def updateFitness(self, newCoord, oldCoord):
+        oldDistance = self.getLightHouseDistance(oldCoord)
+        newDistance = self.getLightHouseDistance(newCoord)
+        if newDistance < oldDistance:
+            self.fitness += 10  # Reward for moving closer
+        else:
+            self.fitness -= 15  # Penalty for moving away
