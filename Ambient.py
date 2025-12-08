@@ -46,30 +46,18 @@ class Ambient:
         return self.agents
     
     def render(self):
-        width, height = self.grid_size
-
-        # cria grelha vazia
-        grid = [['.' for _ in range(width)] for _ in range(height)]
-
-        # desenhar obstáculos
+        # Returns a string representation of the environment
+        grid = [['.' for _ in range(self.grid_size[0])] for _ in range(self.grid_size[1])]
+        
         for obstacle in self.obstacles:
             coord = obstacle.getCoord()
-            x, y = coord.getX(), coord.getY()
-            if 0 <= x < width and 0 <= y < height:
-                grid[y][x] = '#'
-
-        # desenhar farol
-        lh_coord = self.lighthouse.getCoord()
-        x, y = lh_coord.getX(), lh_coord.getY()
-        if 0 <= x < width and 0 <= y < height:
-            grid[y][x] = 'L'
-
-        # desenhar agentes
+            grid[coord.y][coord.x] = '#'
+        
+        lighthouse_coord = self.lighthouse.getCoord()
+        grid[lighthouse_coord.y][lighthouse_coord.x] = 'L'
+        
         for agent in self.agents:
-            coord = agent.coord      # usa o atributo que já tens
-            x, y = coord.getX(), coord.getY()
-            if 0 <= x < width and 0 <= y < height:
-                grid[y][x] = 'A'
-
-        # junta tudo numa string
+            coord = agent.getCoord()
+            grid[coord.y][coord.x] = 'A'
+        
         return '\n'.join(' '.join(row) for row in grid)
