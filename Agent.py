@@ -130,12 +130,14 @@ class Agent:
             self.ambient.occupiedPositions.add(self.coord.as_tuple())
             self.updateFitness(newCoord, oldCoord)
         else:
-            objectType = self.ambient.getObject(newCoord)
-            if objectType == 'Wall':
-                self.fitness -= 20  # Penalize for hitting an obstacle
-            elif objectType == 'Fireplace':
-                self.fitness -= 10  # Penalize for colliding with another agent
-            elif objectType == 'Limit':
+            obj = self.ambient.getObject(newCoord)
+            obj_type = getattr(obj, "type", None)
+
+            if obj_type == 'Wall':
+                self.fitness -= 20
+            elif obj_type == 'Fireplace':
+                self.fitness -= 10
+            elif obj_type in ('Limit', 'Border'):
                 self.fitness -= 25
             # Penalize for invalid move
         
