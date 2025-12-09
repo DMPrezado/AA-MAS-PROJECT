@@ -1,5 +1,3 @@
-# python
-# File: `Main.py`
 from Coord import Coord
 from LightHouse import LightHouse
 from Ambient import Ambient
