@@ -25,15 +25,18 @@ import math
 import pygad
 import random
 import Coord
+from Entity import Entity
 
-class Agent:
-    def __init__(self, name, ambient):
+class Agent(Entity):
+    def __init__(self, name, ambient, pos):
         self.name = name
         self.finished_flag = False
         self.ambient = ambient
+        self.coord = pos
         freePositions = self.ambient.freePositions()
         self.coord = freePositions[random.randint(0, len(freePositions)-1)]
         self.ambient.occupiedPositions.add(self.coord)
+        self.movable = True #override
 
     def executar(self):
         sensorDataFront = self.sensorFront()
