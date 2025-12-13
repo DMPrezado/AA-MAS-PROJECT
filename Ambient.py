@@ -1,7 +1,8 @@
+# Ambient.py
+
 import Coord
 from Obstacle import Obstacle
 from LightHouse import LightHouse
-from Agent import Agent
 
 
 class Ambient:
@@ -29,8 +30,9 @@ class Ambient:
         if lighthouse is not None:
             self.occupiedPositions.add(lighthouse.getCoord().as_tuple())
 
-
-
+    # --------------------------
+    # POSIÇÕES LIVRES
+    # --------------------------
     def freePositions(self):
         free_positions = []
         width, height = self.grid_size
@@ -42,16 +44,18 @@ class Ambient:
 
         return free_positions
 
-
-
+    # --------------------------
+    # GETTERS
+    # --------------------------
     def getLightHouse(self):
         return self.lighthouse
 
     def getAgentsList(self):
         return self.agents
 
-
-
+    # --------------------------
+    # UTIL: coordenada -> tuplo
+    # --------------------------
     def _coord_to_tuple(self, coord):
         if isinstance(coord, Coord.Coord):
             return coord.getX(), coord.getY()
@@ -60,6 +64,9 @@ class Ambient:
         else:
             raise TypeError("coord deve ser Coord ou (x,y)")
 
+    # --------------------------
+    # OBTÉM OBJETO NA COORDENADA
+    # --------------------------
     def getObject(self, coord):
         """
         Devolve o objeto (Agent, Obstacle, LightHouse ou um 'objeto limite') numa dada coordenada.
@@ -95,7 +102,9 @@ class Ambient:
         # nada nessa posição
         return None
 
-
+    # --------------------------
+    # RENDER ASCII
+    # --------------------------
     def render(self):
         """
         Representação visual da grelha:
@@ -115,11 +124,7 @@ class Ambient:
             c = obstacle.getCoord()
             x, y = c.getX(), c.getY()
 
-            # tenta apanhar tipo de várias formas (depende de como implementares Obstacle)
-            if hasattr(obstacle, "getType"):
-                obj_type = obstacle.getType()
-            else:
-                obj_type = getattr(obstacle, "type", None)
+            obj_type = obstacle.getType()
 
             if obj_type == "Wall":
                 grid[y][x] = 'W'
@@ -128,7 +133,6 @@ class Ambient:
             elif obj_type in ("Limit", "Border"):
                 grid[y][x] = 'B'
             else:
-                # fallback para algum tipo desconhecido
                 grid[y][x] = '#'
 
         # farol
@@ -141,11 +145,11 @@ class Ambient:
             c = agent.getCoord()
             grid[c.getY()][c.getX()] = 'A'
 
-        # string formatada
         return '\n'.join(' '.join(row) for row in grid)
 
-
-
+    # --------------------------
+    # CARREGAR DE TXT (opcional)
+    # --------------------------
     @staticmethod
     def from_txt(filename):
         """
@@ -156,8 +160,6 @@ class Ambient:
           W = wall
           F = fireplace
           B = border / limit (obstáculo do tipo 'Limit')
-
-        Retorna um objeto Ambient completamente configurado.
         """
         with open(filename, 'r') as f:
             raw_lines = [line.rstrip('\n') for line in f if line.strip()]
@@ -168,7 +170,6 @@ class Ambient:
         height = len(raw_lines)
         width = len(raw_lines[0])
 
-        # verificar se o mapa é retangular
         for line in raw_lines:
             if len(line) != width:
                 raise ValueError("Todas as linhas do mapa precisam ter o mesmo comprimento.")
@@ -177,7 +178,6 @@ class Ambient:
         obstacles = []
         lighthouse = None
 
-        # ler cada célula da grelha
         for y, line in enumerate(raw_lines):
             for x, ch in enumerate(line):
                 coord = Coord.Coord(x, y)
@@ -192,19 +192,16 @@ class Ambient:
                     lighthouse = LightHouse(coord)
                 elif ch == 'A':
                     agents_temp.append((f"A{x}_{y}", coord))
-                # '.' é vazio → ignora
+                # '.' é vazio
 
-        # criar ambiente vazio (sem agentes ainda)
         ambient = Ambient([], obstacles, lighthouse, (width, height))
 
-        # agora criar agentes reais em posições fixas
+        from Agent import Agent  # import local para evitar ciclos
         real_agents = []
         for name, coord in agents_temp:
-            a = Agent(name, ambient)  # se o teu Agent aceitar coord, podes usar Agent(name, ambient, coord)
-            a.coord = coord  # força a coord definida no mapa
+            a = Agent(name, ambient, coord)
             real_agents.append(a)
 
-        # atualizar agentes e posições ocupadas
         ambient.agents = real_agents
         ambient.occupiedPositions = set()
 

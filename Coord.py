@@ -12,6 +12,8 @@
 #         - distance_to(other: Coord) -> float
 #         - as_tuple() -> tuple[int,int]
 
+# Coord.py
+
 class Coord:
     def __init__(self, x, y):
         self.x = x
@@ -42,3 +44,16 @@ class Coord:
 
     def as_tuple(self):
         return (self.x, self.y)
+
+    def __add__(self, other):
+        """
+        Permite fazer:
+          Coord + Coord
+          Coord + (dx, dy)
+        """
+        if isinstance(other, Coord):
+            return Coord(self.x + other.x, self.y + other.y)
+        elif isinstance(other, tuple) and len(other) == 2:
+            dx, dy = other
+            return Coord(self.x + dx, self.y + dy)
+        raise TypeError("Só posso somar Coord com Coord ou (dx, dy)")
