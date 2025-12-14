@@ -9,62 +9,17 @@ import time
 from Conf import ConfigLightHouse as Conf
 
 
-
 def main():
+
 
     # # --------------------------
     # # CONFIG DO MAPA
     # # --------------------------
-    # ambient = Ambient()
-
-    # # cria 1 agente
-    # start_pos = random.choice(ambient.freePositions())
-    # agent = Agent("A0", ambient, start_pos)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # --------------------------
-    # CONFIG DO MAPA
-    # --------------------------
-    width, height = 10, 8
-    lighthouse = LightHouse(Coord(8, 6))
-
-    obstacles = [
-        Obstacle(Coord(4, 1), "Wall"),
-        Obstacle(Coord(4, 2), "Wall"),
-        Obstacle(Coord(4, 3), "Wall"),
-        Obstacle(Coord(4, 4), "Wall"),
-        Obstacle(Coord(2, 6), "Fireplace"),
-        Obstacle(Coord(6, 6), "Fireplace"),
-    ]
-
-    ambient = Ambient([], obstacles, lighthouse, (width, height))
+    ambient = Ambient.from_txt(Conf.FILE_EPISODES_INITIAL_POSITIONS)
 
     # cria 1 agente
     start_pos = random.choice(ambient.freePositions())
     agent = Agent("A0", ambient, start_pos)
-
-
-
-
-
-
-
-
-
-
-
 
 
     # --------------------------
@@ -138,7 +93,7 @@ def reset_agent_random(ambient, agent):
     agent.prev_pos = None
     agent.fitness = 0
 
-def run_episode(ambient, agent, max_steps=80, render_each_step=False, delay=0.05):
+def run_episode(ambient, agent, max_steps=80, render_each_step=False, delay=0.1):
     """Executa 1 episódio e devolve (steps_usados, fitness_final, chegou_ao_farol)."""
     for t in range(max_steps):
         agent.executar()
