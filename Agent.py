@@ -23,6 +23,7 @@
 
 # Agent.py
 import math
+import random
 import Coord
 from Entity import Entity
 from LightHouse import LightHouse
@@ -49,6 +50,19 @@ class Agent(Entity):
 
         self.ambient.agents.append(self)
         self.ambient.occupiedPositions.add(self.coord.as_tuple())
+
+
+    def getObject(self, coord):
+        for o in self.ambient.obstacles:
+            if o.getCoord().as_tuple() == coord.as_tuple():
+                return o
+        for a in self.ambient.agents:
+            if a.getCoord().as_tuple() == coord.as_tuple():
+                return a
+        for lh in [self.ambient.lighthouse]:
+            if lh.getCoord().as_tuple() == coord.as_tuple():
+                return lh
+        return None
 
     # ---------- sensores ----------
     def _sense_in_direction(self, direction):
@@ -96,7 +110,11 @@ class Agent(Entity):
         ax, ay = self.coord.x, self.coord.y
         lh = self.ambient.getLightHouse().getCoord()
         lx, ly = lh.x, lh.y
-        return math.degrees(math.atan2(ly - ay, lx - ax))
+
+        angle = math.degrees(math.atan2(ly - ay, lx - ax)) + 90
+        angle = (angle + 180) % 360 - 180
+        return angle
+
 
     # ---------- estado ----------
     def get_state(self):
@@ -121,24 +139,15 @@ class Agent(Entity):
         b_dist, b_type = self.sensorBack()
         l_dist, l_type = self.sensorLeft()
         r_dist, r_type = self.sensorRight()
+        lh_angle       = self.sensorDirection()
 
-        lh = self.ambient.getLightHouse().getCoord()
-        dx = lh.x - self.coord.x
-        dy = lh.y - self.coord.y
-
-        def sign(v):
-            if v > 0: return 1
-            if v < 0: return -1
-            return 0
-
-        sx, sy = sign(dx), sign(dy)
 
         return (
             code.get(f_type, 6), bucket(f_dist),
             code.get(b_type, 6), bucket(b_dist),
             code.get(l_type, 6), bucket(l_dist),
             code.get(r_type, 6), bucket(r_dist),
-            sx, sy
+            lh_angle
         )
 
     def distance_to_lighthouse(self):
@@ -148,7 +157,7 @@ class Agent(Entity):
         return math.sqrt((lx - ax) ** 2 + (ly - ay) ** 2)
 
     # ---------- decisão (aprendizagem) ----------
-    def movementChoice(self, sensorDataFront, sensorDataBack, sensorDataLeft, sensorDataRight, sensorDataDirection):
+    def movementChoice(self):
         state = self.get_state()
         action = choose_action(state)
 
@@ -174,12 +183,7 @@ class Agent(Entity):
                 reward = Conf.REWARD_HIT_WALL
 
             elif t == "Fireplace":
-                # “caiu” -> entra e penaliza
-                self.ambient.occupiedPositions.discard(self.coord.as_tuple())
-                self.coord = newCoord
-                self.ambient.occupiedPositions.add(self.coord.as_tuple())
                 reward = Conf.REWARD_IN_FIREPLACE
-                self.prev_pos = old_pos
 
             else:
                 reward = Conf.REWARD_HIT_OBJECT
@@ -208,13 +212,99 @@ class Agent(Entity):
             update_Q(self.last_state, self.last_action, reward, next_state)
 
     def executar(self):
-        f = self.sensorFront()
-        b = self.sensorBack()
-        l = self.sensorLeft()
-        r = self.sensorRight()
-        d = self.sensorDirection()
-
-        moveCoord = self.movementChoice(f, b, l, r, d)
+        if Conf.MOVE_WITH_QLEARNING:
+            moveCoord = self.movementChoice()
+        elif Conf.MOVE_WITH_FIXED_POLICIES:
+            moveCoord = self.fixedPolicyChoice()
         self.moveTo(moveCoord)
+
+
+    def fixedPolicyChoice(self):
+        #lista de possiveis movimentos
+        possible_moves = []
+
+        #Lê os sensores
+        f_dist, f_type = self.sensorFront()
+        b_dist, b_type = self.sensorBack()
+        l_dist, l_type = self.sensorLeft()
+        r_dist, r_type = self.sensorRight()
+        lh_angle       = self.sensorDirection()
+
+
+
+        if f_type == "LightHouse":
+            return possible_moves.append(self.coord + Coord.Coord(self.whereIsFront[0], self.whereIsFront[1]))
+        elif l_type == "LightHouse":
+            return possible_moves.append(self.coord + Coord.Coord(-self.whereIsFront[1], self.whereIsFront[0]))
+        elif r_type == "LightHouse":
+            return possible_moves.append(self.coord + Coord.Coord(self.whereIsFront[1], -self.whereIsFront[0]))
+        elif b_type == "LightHouse":
+            return possible_moves.append(self.coord + Coord.Coord(-self.whereIsFront[0], -self.whereIsFront[1]))
+        
+
+
+
+        """
+            Vê direção do farol caso LH not in sight 
+        """
+        if -45 <= lh_angle <= 45:
+        # Farol está à frente
+            if f_dist > 0:
+                for _ in range(6):
+                    possible_moves.append((self.whereIsFront[0] + self.coord[0], self.whereIsFront[1] + self.coord[1]))
+            if l_dist > 0:
+                for _ in range(2):
+                    possible_moves.append((-self.whereIsFront[1] + self.coord[0], self.whereIsFront[0] + self.coord[1]))
+            if r_dist > 0:
+                for _ in range(2):
+                    possible_moves.append((self.whereIsFront[1] + self.coord[0], -self.whereIsFront[0] + self.coord[1]))
+            if b_dist > 0:
+                possible_moves.append((-self.whereIsFront[0] + self.coord[0], -self.whereIsFront[1] + self.coord[1]))
+
+        elif 45 < lh_angle <= 135:
+            # Farol está à esquerda
+            if l_dist > 0:
+                for _ in range(6):
+                    possible_moves.append((-self.whereIsFront[1] + self.coord[0], self.whereIsFront[0] + self.coord[1]))
+            if f_dist > 0:
+                for _ in range(2):
+                    possible_moves.append((self.whereIsFront[0] + self.coord[0], self.whereIsFront[1] + self.coord[1]))
+            if b_dist > 0:
+                for _ in range(2):
+                    possible_moves.append((-self.whereIsFront[0] + self.coord[0], -self.whereIsFront[1] + self.coord[1]))
+            if r_dist > 0:
+                possible_moves.append((self.whereIsFront[1] + self.coord[0], -self.whereIsFront[0] + self.coord[1]))
+
+        elif -135 <= lh_angle < -45:
+            # Farol está à direita
+            if r_dist > 0:
+                for _ in range(6):
+                    possible_moves.append((self.whereIsFront[1] + self.coord[0], -self.whereIsFront[0] + self.coord[1]))
+            if f_dist > 0:
+                for _ in range(2):
+                    possible_moves.append((self.whereIsFront[0] + self.coord[0], self.whereIsFront[1] + self.coord[1]))
+            if b_dist > 0:
+                for _ in range(2):
+                    possible_moves.append((-self.whereIsFront[0] + self.coord[0], -self.whereIsFront[1] + self.coord[1]))
+            if l_dist > 0:
+                possible_moves.append((-self.whereIsFront[1] + self.coord[0], self.whereIsFront[0] + self.coord[1]))
+
+        else:
+            # Farol está atrás
+            if b_dist > 0:
+                for _ in range(6):
+                    possible_moves.append((-self.whereIsFront[0] + self.coord[0], -self.whereIsFront[1] + self.coord[1]))
+            if l_dist > 0:
+                for _ in range(2):
+                    possible_moves.append((-self.whereIsFront[1] + self.coord[0], self.whereIsFront[0] + self.coord[1]))
+            if r_dist > 0:
+                for _ in range(2):
+                    possible_moves.append((self.whereIsFront[1] + self.coord[0], -self.whereIsFront[0] + self.coord[1]))
+            if f_dist > 0:
+                possible_moves.append((self.whereIsFront[0] + self.coord[0], self.whereIsFront[1] + self.coord[1]))
+
+                
+        return random.choice(possible_moves) if possible_moves else self.coord
+            
 
 

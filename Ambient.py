@@ -117,7 +117,7 @@ class Ambient:
 
         for a in self.agents:
             c = a.getCoord()
-            grid[c.getY()][c.getX()] = "A"
+            grid[c.getY()][c.getX()] = "\033[92mA\033[0m"
 
         return "\n".join(" ".join(row) for row in grid)
 
@@ -167,6 +167,9 @@ class Ambient:
                     lighthouse = LightHouse(coord)
                 elif ch == "A":
                     agent_spawns.append(coord)
+                else:
+                    # vazio ou desconhecido
+                    pass
 
         ambient = Ambient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])
 
