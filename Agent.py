@@ -24,7 +24,6 @@
 # Agent.py
 
 import math
-import random
 import Coord
 from Entity import Entity
 from LightHouse import LightHouse
@@ -35,30 +34,31 @@ from qlearning import ACTIONS, choose_action, update_Q
 class Agent(Entity):
     def __init__(self, name, ambient, pos):
         super().__init__(pos)
+        self.type = "Agent"
         self.name = name
-        self.finished_flag = False
         self.ambient = ambient
+
+        self.finished_flag = False
         self.fitness = 0
-        self.whereIsFront = (0, -1)  # a apontar para cima
+
+        self.whereIsFront = (0, -1)  # não estamos a mudar orientação neste exemplo
         self.movable = True
 
-        # para Q-learning
+        # Q-learning
         self.last_state = None
         self.last_action = None
+
+        # anti-loop
+        self.prev_pos = None
 
         # registar no ambiente
         self.ambient.agents.append(self)
         self.ambient.occupiedPositions.add(self.coord.as_tuple())
 
     # --------------------------
-    # SENSORES – FUNÇÃO AUXILIAR
+    # Sensores: raio numa direção
     # --------------------------
     def _sense_in_direction(self, direction):
-        """
-        Dispara um “raio” na direção (dx, dy).
-        Conta células livres até bater em algo.
-        Devolve (distancia_livre: int, tipo_objeto: str ou None).
-        """
         dx, dy = direction
         steps = 0
         current = self.coord
@@ -71,9 +71,7 @@ class Agent(Entity):
                 steps += 1
                 continue
 
-            # apanhou alguma coisa
             obj_type = getattr(obj, "type", None)
-
             if isinstance(obj, LightHouse):
                 obj_type = "LightHouse"
             elif isinstance(obj, Obstacle):
@@ -85,9 +83,6 @@ class Agent(Entity):
 
             return (steps, obj_type)
 
-    # --------------------------
-    # SENSORES PÚBLICOS
-    # --------------------------
     def sensorFront(self):
         return self._sense_in_direction(self.whereIsFront)
 
@@ -104,23 +99,15 @@ class Agent(Entity):
         return self._sense_in_direction((fy, -fx))
 
     def sensorDirection(self):
-        """
-        Ângulo (graus) para o farol.
-        """
         ax, ay = self.coord.x, self.coord.y
         lh = self.ambient.getLightHouse().getCoord()
         lx, ly = lh.x, lh.y
         return math.degrees(math.atan2(ly - ay, lx - ax))
 
     # --------------------------
-    # ESTADO PARA Q-LEARNING
+    # Estado com tipos + distâncias em buckets
     # --------------------------
     def get_state(self):
-        """
-        Estado = (front_type, back_type, left_type, right_type, sx, sy)
-        codificando tipo por números simples.
-        """
-        # mapear tipo para código inteiro
         code = {
             None: 0,
             "LightHouse": 1,
@@ -132,17 +119,18 @@ class Agent(Entity):
             "Other": 6,
         }
 
+        def bucket(d):
+            if d == 0: return 0
+            if d == 1: return 1
+            if d <= 3: return 2
+            return 3
+
         f_dist, f_type = self.sensorFront()
         b_dist, b_type = self.sensorBack()
         l_dist, l_type = self.sensorLeft()
         r_dist, r_type = self.sensorRight()
 
-        f_code = code.get(f_type, 6)
-        b_code = code.get(b_type, 6)
-        l_code = code.get(l_type, 6)
-        r_code = code.get(r_type, 6)
-
-        # direção grossa para o farol
+        # direção grossa para farol
         lh = self.ambient.getLightHouse().getCoord()
         dx = lh.x - self.coord.x
         dy = lh.y - self.coord.y
@@ -152,13 +140,18 @@ class Agent(Entity):
             if v < 0: return -1
             return 0
 
-        sx = sign(dx)
-        sy = sign(dy)
+        sx, sy = sign(dx), sign(dy)
 
-        return (f_code, b_code, l_code, r_code, sx, sy)
+        return (
+            code.get(f_type, 6), bucket(f_dist),
+            code.get(b_type, 6), bucket(b_dist),
+            code.get(l_type, 6), bucket(l_dist),
+            code.get(r_type, 6), bucket(r_dist),
+            sx, sy
+        )
 
     # --------------------------
-    # DISTÂNCIA AO FAROL
+    # Distância ao farol
     # --------------------------
     def distance_to_lighthouse(self):
         ax, ay = self.coord.x, self.coord.y
@@ -167,19 +160,20 @@ class Agent(Entity):
         return math.sqrt((lx - ax) ** 2 + (ly - ay) ** 2)
 
     # --------------------------
-    # ESCOLHA DE MOVIMENTO (Q-LEARNING)
+    # Escolher movimento com anti-reversão
     # --------------------------
-    def movementChoice(self, sensorDataFront, sensorDataBack,
-                       sensorDataLeft, sensorDataRight, sensorDataDirection):
-        """
-        Integra com Q-Learning:
-        - calcula estado a partir dos sensores
-        - escolhe ação ε-greedy
-        - guarda last_state e last_action
-        - devolve a nova coordenada para tentar mover
-        """
+    def movementChoice(self, sensorDataFront, sensorDataBack, sensorDataLeft, sensorDataRight, sensorDataDirection):
         state = self.get_state()
-        action = choose_action(state)
+
+        # banir a ação que volta imediatamente à posição anterior (se existir)
+        banned = set()
+        if self.prev_pos is not None:
+            for a, (dx, dy) in ACTIONS.items():
+                cand = (self.coord.x + dx, self.coord.y + dy)
+                if cand == self.prev_pos:
+                    banned.add(a)
+
+        action = choose_action(state, banned_actions=banned)
 
         self.last_state = state
         self.last_action = action
@@ -188,71 +182,65 @@ class Agent(Entity):
         return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
 
     # --------------------------
-    # MOVER + ATUALIZAR Q
+    # Mover + reward do enunciado + update Q
     # --------------------------
     def moveTo(self, newCoord):
-        """
-        Tenta mover para newCoord, calcula reward e faz update do Q-learning.
-        """
+        old_pos = self.coord.as_tuple()
         old_dist = self.distance_to_lighthouse()
-        reward = 0
-        moved = False
 
         obj = self.ambient.getObject(newCoord)
+        reward = 0
 
-        # limite fora da grelha
+        # fora do mapa
         if obj is not None and getattr(obj, "type", None) == "Limit":
-            reward = -25
+            reward = -30  # tratar limite como "bater" (se quiseres outro valor, muda aqui)
 
-        # obstáculo interno
+        # obstáculo
         elif isinstance(obj, Obstacle):
-            if obj.getType() == "Wall":
-                reward = -20
-            elif obj.getType() == "Fireplace":
-                reward = -10
+            t = obj.getType()
+
+            if t == "Wall":
+                reward = -30
+
+            elif t == "Fireplace":
+                # "caiu na fogueira" -> entra e leva -50
+                self.ambient.occupiedPositions.discard(self.coord.as_tuple())
+                self.coord = newCoord
+                self.ambient.occupiedPositions.add(self.coord.as_tuple())
+                reward = -50
+                self.prev_pos = old_pos
+
             else:
-                reward = -15
+                reward = -30
 
         else:
-            # posição livre ou farol ou outro agente (simples)
-            # atualizar posição
+            # livre ou farol
             self.ambient.occupiedPositions.discard(self.coord.as_tuple())
             self.coord = newCoord
             self.ambient.occupiedPositions.add(self.coord.as_tuple())
-            moved = True
+            self.prev_pos = old_pos
 
-            new_dist = self.distance_to_lighthouse()
             lh = self.ambient.getLightHouse().getCoord()
-
-            if self.coord.x == lh.x and self.coord.y == lh.y:
+            if self.coord.as_tuple() == lh.as_tuple():
                 reward = 100
                 self.finished_flag = True
             else:
+                new_dist = self.distance_to_lighthouse()
                 if new_dist < old_dist:
-                    reward = 5
+                    reward = 10
                 else:
-                    reward = -10
+                    reward = -15
 
-        # atualizar fitness só para debug
         self.fitness += reward
 
-        # atualizar Q-table
         if self.last_state is not None and self.last_action is not None:
             next_state = self.get_state()
             update_Q(self.last_state, self.last_action, reward, next_state)
 
-        return moved
-
     # --------------------------
-    # EXECUTAR UM PASSO
+    # Um passo do agente
     # --------------------------
     def executar(self):
-        """
-        Um passo do agente:
-        - lê sensores
-        - escolhe movimento via Q-learning (movementChoice)
-        - faz moveTo (que atualiza Q)
-        """
         f = self.sensorFront()
         b = self.sensorBack()
         l = self.sensorLeft()
@@ -261,3 +249,4 @@ class Agent(Entity):
 
         moveCoord = self.movementChoice(f, b, l, r, d)
         self.moveTo(moveCoord)
+
