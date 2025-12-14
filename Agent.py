@@ -22,7 +22,6 @@
 
 
 # Agent.py
-
 import math
 import Coord
 from Entity import Entity
@@ -42,23 +41,16 @@ class Agent(Entity):
         self.finished_flag = False
         self.fitness = 0
 
-        self.whereIsFront = (0, -1)  # não estamos a mudar orientação neste exemplo
+        self.whereIsFront = (0, -1)
         self.movable = True
 
-        # Q-learning
         self.last_state = None
         self.last_action = None
 
-        # anti-loop
-        self.prev_pos = None
-
-        # registar no ambiente
         self.ambient.agents.append(self)
         self.ambient.occupiedPositions.add(self.coord.as_tuple())
 
-    # --------------------------
-    # Sensores: raio numa direção
-    # --------------------------
+    # ---------- sensores ----------
     def _sense_in_direction(self, direction):
         dx, dy = direction
         steps = 0
@@ -73,6 +65,7 @@ class Agent(Entity):
                 continue
 
             obj_type = getattr(obj, "type", None)
+
             if isinstance(obj, LightHouse):
                 obj_type = "LightHouse"
             elif isinstance(obj, Obstacle):
@@ -105,9 +98,7 @@ class Agent(Entity):
         lx, ly = lh.x, lh.y
         return math.degrees(math.atan2(ly - ay, lx - ax))
 
-    # --------------------------
-    # Estado com tipos + distâncias em buckets
-    # --------------------------
+    # ---------- estado ----------
     def get_state(self):
         code = {
             None: 0,
@@ -131,7 +122,6 @@ class Agent(Entity):
         l_dist, l_type = self.sensorLeft()
         r_dist, r_type = self.sensorRight()
 
-        # direção grossa para farol
         lh = self.ambient.getLightHouse().getCoord()
         dx = lh.x - self.coord.x
         dy = lh.y - self.coord.y
@@ -151,30 +141,16 @@ class Agent(Entity):
             sx, sy
         )
 
-    # --------------------------
-    # Distância ao farol
-    # --------------------------
     def distance_to_lighthouse(self):
         ax, ay = self.coord.x, self.coord.y
         lh = self.ambient.getLightHouse().getCoord()
         lx, ly = lh.x, lh.y
         return math.sqrt((lx - ax) ** 2 + (ly - ay) ** 2)
 
-    # --------------------------
-    # Escolher movimento com anti-reversão
-    # --------------------------
+    # ---------- decisão (aprendizagem) ----------
     def movementChoice(self, sensorDataFront, sensorDataBack, sensorDataLeft, sensorDataRight, sensorDataDirection):
         state = self.get_state()
-
-        # banir a ação que volta imediatamente à posição anterior (se existir)
-        banned = set()
-        if self.prev_pos is not None:
-            for a, (dx, dy) in ACTIONS.items():
-                cand = (self.coord.x + dx, self.coord.y + dy)
-                if cand == self.prev_pos:
-                    banned.add(a)
-
-        action = choose_action(state, banned_actions=banned)
+        action = choose_action(state)
 
         self.last_state = state
         self.last_action = action
@@ -182,29 +158,23 @@ class Agent(Entity):
         dx, dy = ACTIONS[action]
         return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
 
-    # --------------------------
-    # Mover + reward do enunciado + update Q
-    # --------------------------
+    # ---------- execução + recompensa + update Q ----------
     def moveTo(self, newCoord):
-        old_pos = self.coord.as_tuple()
         old_dist = self.distance_to_lighthouse()
-
         obj = self.ambient.getObject(newCoord)
         reward = 0
 
-        # fora do mapa
+        # fora do mapa -> tratei como parede (se no vosso enunciado houver valor próprio, mete aqui)
         if obj is not None and getattr(obj, "type", None) == "Limit":
-            reward = -30  # tratar limite como "bater" (se quiseres outro valor, muda aqui)
+            reward = -30
 
-        # obstáculo
         elif isinstance(obj, Obstacle):
             t = obj.getType()
-
             if t == "Wall":
                 reward = Conf.REWARD_HIT_WALL
 
             elif t == "Fireplace":
-                # "caiu na fogueira" -> entra e leva -50
+                # “caiu” -> entra e penaliza
                 self.ambient.occupiedPositions.discard(self.coord.as_tuple())
                 self.coord = newCoord
                 self.ambient.occupiedPositions.add(self.coord.as_tuple())
@@ -219,7 +189,6 @@ class Agent(Entity):
             self.ambient.occupiedPositions.discard(self.coord.as_tuple())
             self.coord = newCoord
             self.ambient.occupiedPositions.add(self.coord.as_tuple())
-            self.prev_pos = old_pos
 
             lh = self.ambient.getLightHouse().getCoord()
             if self.coord.as_tuple() == lh.as_tuple():
@@ -238,9 +207,6 @@ class Agent(Entity):
             next_state = self.get_state()
             update_Q(self.last_state, self.last_action, reward, next_state)
 
-    # --------------------------
-    # Um passo do agente
-    # --------------------------
     def executar(self):
         f = self.sensorFront()
         b = self.sensorBack()
@@ -250,4 +216,5 @@ class Agent(Entity):
 
         moveCoord = self.movementChoice(f, b, l, r, d)
         self.moveTo(moveCoord)
+
 
