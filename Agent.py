@@ -29,6 +29,7 @@ from Entity import Entity
 from LightHouse import LightHouse
 from Obstacle import Obstacle
 from qlearning import ACTIONS, choose_action, update_Q
+from Conf import ConfigLightHouse as Conf
 
 
 class Agent(Entity):
@@ -200,18 +201,18 @@ class Agent(Entity):
             t = obj.getType()
 
             if t == "Wall":
-                reward = -30
+                reward = Conf.REWARD_HIT_WALL
 
             elif t == "Fireplace":
                 # "caiu na fogueira" -> entra e leva -50
                 self.ambient.occupiedPositions.discard(self.coord.as_tuple())
                 self.coord = newCoord
                 self.ambient.occupiedPositions.add(self.coord.as_tuple())
-                reward = -50
+                reward = Conf.REWARD_IN_FIREPLACE
                 self.prev_pos = old_pos
 
             else:
-                reward = -30
+                reward = Conf.REWARD_HIT_OBJECT
 
         else:
             # livre ou farol
@@ -222,14 +223,14 @@ class Agent(Entity):
 
             lh = self.ambient.getLightHouse().getCoord()
             if self.coord.as_tuple() == lh.as_tuple():
-                reward = 100
+                reward = Conf.REWARD_REACH_GOAL
                 self.finished_flag = True
             else:
                 new_dist = self.distance_to_lighthouse()
                 if new_dist < old_dist:
-                    reward = 10
+                    reward = Conf.REWARD_STEP_CLOSER
                 else:
-                    reward = -15
+                    reward = Conf.REWARD_STEP_AWAY
 
         self.fitness += reward
 

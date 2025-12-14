@@ -10,6 +10,20 @@ import random
 import time
 
 
+"""
+    Precisamos de importar:
+        - Receber o mada de um txt ambient.import_from_txt(...)
+        - Definir numero de episódios de treino
+        - Máximo de passos por episódio
+        - Rewards definidos
+        - Politicas fixas
+"""
+
+
+
+
+
+
 def reset_agent_random(ambient, agent):
     """Reinicia o agente numa posição aleatória livre (sem reset da Q-table)."""
     ambient.occupiedPositions.discard(agent.coord.as_tuple())
