@@ -244,38 +244,110 @@ class ForagingAgent(Entity):
     # --------------------------
 
     def fixedPolicyChoice(self):
-        # Heurística simples só para debug (não usada em qlearning)
-        ndx, ndy = self.sensorNestVector()
-        rdx, rdy = self.sensorNearestResourceVector()
+        """
+        Política fixa:
+        1) Se estiver em cima de recurso e não tiver -> PICK
+        2) Se estiver no ninho e tiver -> DROP
+        3) Caso contrário:
+            - se não tiver recurso: vai para o recurso mais próximo (greedy por Manhattan)
+            - se tiver recurso: vai para o ninho
+            - evita Wall/Limit/Fireplace
+        """
 
-        target_dx, target_dy = (ndx, ndy) if self.has_resource else (rdx, rdy)
+        # 1) PICK se estou em cima do recurso
+        if (not self.has_resource) and self.ambient.has_resource_at(self.coord):
+            return PICK_ACTION
 
-        prefs = []
-        if abs(target_dx) >= abs(target_dy):
-            if target_dx > 0: prefs.append(3)
-            if target_dx < 0: prefs.append(2)
-            if target_dy > 0: prefs.append(1)
-            if target_dy < 0: prefs.append(0)
+        # 2) DROP se estou no ninho
+        here = self.ambient.getObject(self.coord)
+        if self.has_resource and isinstance(here, Nest):
+            return DROP_ACTION
+
+        # 3) Escolher alvo
+        if self.has_resource:
+            tx, ty = self.ambient.getNest().getCoord().x, self.ambient.getNest().getCoord().y
         else:
-            if target_dy > 0: prefs.append(1)
-            if target_dy < 0: prefs.append(0)
-            if target_dx > 0: prefs.append(3)
-            if target_dx < 0: prefs.append(2)
+            # recurso mais próximo
+            if not self.ambient.resources:
+                # se já não há recursos, vagueia
+                return random.choice([0, 1, 2, 3])
 
-        for a in [0, 1, 2, 3]:
-            if a not in prefs:
-                prefs.append(a)
+            ax, ay = self.coord.x, self.coord.y
+            best = None
+            best_d = 10**9
+            for r in self.ambient.resources:
+                rx, ry = r.getCoord().x, r.getCoord().y
+                d = abs(rx - ax) + abs(ry - ay)
+                if d < best_d:
+                    best_d = d
+                    best = (rx, ry)
 
-        return prefs[0] if prefs else random.choice([0, 1, 2, 3])
+            tx, ty = best
+
+        # direções possíveis (ação -> (dx,dy))
+        directions = {
+            0: (0, -1),  # up
+            1: (0,  1),  # down
+            2: (-1, 0),  # left
+            3: (1,  0),  # right
+        }
+
+        def is_blocked(coord):
+            obj = self.ambient.getObject(coord)
+            if obj is None:
+                return False
+            if getattr(obj, "type", None) == "Limit":
+                return True
+            if isinstance(obj, Obstacle):
+                # evita paredes e fogueiras
+                t = obj.getType()
+                return t in ("Wall", "Fireplace", "Limit")
+            return False
+
+            # 4) Greedy: escolhe o move que minimiza distância Manhattan ao alvo
+        best_actions = []
+        best_dist = 10**9
+
+        for a, (dx, dy) in directions.items():
+            nc = Coord.Coord(self.coord.x + dx, self.coord.y + dy)
+
+            if is_blocked(nc):
+                continue
+
+            d = abs(tx - nc.x) + abs(ty - nc.y)
+            if d < best_dist:
+                best_dist = d
+                best_actions = [a]
+            elif d == best_dist:
+                best_actions.append(a)
+
+        # Se há boas escolhas, escolhe uma (com algum random para fugir a empates)
+        if best_actions:
+            return random.choice(best_actions)
+
+        # 5) fallback: se tudo está bloqueado, tenta qualquer direção não bloqueada
+        fallback = [a for a,(dx,dy) in directions.items()
+                    if not is_blocked(Coord.Coord(self.coord.x + dx, self.coord.y + dy))]
+        if fallback:
+            return random.choice(fallback)
+
+        # 6) se estiver encurralado total, não mexe (mas como só temos 0..5, devolve um move)
+        return random.choice([0, 1, 2, 3])
+    
+
 
     def executar(self):
         if Conf.MOVE_WITH_QLEARNING:
             action = self.movementChoice()
         elif Conf.MOVE_WITH_FIXED_POLICIES:
             action = self.fixedPolicyChoice()
+            # para o fixed também faz sentido guardar isto (assim apply_action pode atualizar Q se quiseres)
             self.last_state = self.get_state()
             self.last_action = action
         else:
             raise ValueError("Config inválida em ConfForaging.py")
 
         self.apply_action(action)
+
+
+
