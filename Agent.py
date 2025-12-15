@@ -32,6 +32,7 @@ from qlearning import ACTIONS, choose_action, update_Q
 from Conf import ConfigLightHouse as Conf
 
 
+
 class Agent(Entity):
     def __init__(self, name, ambient, pos):
         super().__init__(pos)
@@ -211,100 +212,81 @@ class Agent(Entity):
             next_state = self.get_state()
             update_Q(self.last_state, self.last_action, reward, next_state)
 
+
+
+
     def executar(self):
         if Conf.MOVE_WITH_QLEARNING:
             moveCoord = self.movementChoice()
+
         elif Conf.MOVE_WITH_FIXED_POLICIES:
             moveCoord = self.fixedPolicyChoice()
+
+        else:
+            raise ValueError(
+            "Config inválida: escolhe 'fixed' ou 'qlearning' no Conf.py"
+        )
+
         self.moveTo(moveCoord)
 
 
-    def fixedPolicyChoice(self):
-        #lista de possiveis movimentos
-        possible_moves = []
 
-        #Lê os sensores
+
+    def fixedPolicyChoice(self):
         f_dist, f_type = self.sensorFront()
         b_dist, b_type = self.sensorBack()
         l_dist, l_type = self.sensorLeft()
         r_dist, r_type = self.sensorRight()
-        lh_angle       = self.sensorDirection()
+        angle = self.sensorDirection()
 
+        front = self.whereIsFront
+        back  = (-front[0], -front[1])
+        left  = (-front[1], front[0])
+        right = (front[1], -front[0])
 
+        def step(direction):
+            dx, dy = direction
+            return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
 
-        if f_type == "LightHouse":
-            return possible_moves.append(self.coord + Coord.Coord(self.whereIsFront[0], self.whereIsFront[1]))
-        elif l_type == "LightHouse":
-            return possible_moves.append(self.coord + Coord.Coord(-self.whereIsFront[1], self.whereIsFront[0]))
-        elif r_type == "LightHouse":
-            return possible_moves.append(self.coord + Coord.Coord(self.whereIsFront[1], -self.whereIsFront[0]))
-        elif b_type == "LightHouse":
-            return possible_moves.append(self.coord + Coord.Coord(-self.whereIsFront[0], -self.whereIsFront[1]))
-        
+        def is_free(c):
+            obj = self.ambient.getObject(c)
+            return (obj is None) or isinstance(obj, LightHouse)
 
+    # 1) Se o farol estiver visível, ir direto
+        if f_type == "LightHouse" and f_dist > 0:
+            c = step(front)
+            return c if is_free(c) else self.coord
 
+        if l_type == "LightHouse" and l_dist > 0:
+            c = step(left)
+            return c if is_free(c) else self.coord
 
-        """
-            Vê direção do farol caso LH not in sight 
-        """
-        if -45 <= lh_angle <= 45:
-        # Farol está à frente
-            if f_dist > 0:
-                for _ in range(6):
-                    possible_moves.append((self.whereIsFront[0] + self.coord[0], self.whereIsFront[1] + self.coord[1]))
-            if l_dist > 0:
-                for _ in range(2):
-                    possible_moves.append((-self.whereIsFront[1] + self.coord[0], self.whereIsFront[0] + self.coord[1]))
-            if r_dist > 0:
-                for _ in range(2):
-                    possible_moves.append((self.whereIsFront[1] + self.coord[0], -self.whereIsFront[0] + self.coord[1]))
-            if b_dist > 0:
-                possible_moves.append((-self.whereIsFront[0] + self.coord[0], -self.whereIsFront[1] + self.coord[1]))
+        if r_type == "LightHouse" and r_dist > 0:
+            c = step(right)
+            return c if is_free(c) else self.coord
 
-        elif 45 < lh_angle <= 135:
-            # Farol está à esquerda
-            if l_dist > 0:
-                for _ in range(6):
-                    possible_moves.append((-self.whereIsFront[1] + self.coord[0], self.whereIsFront[0] + self.coord[1]))
-            if f_dist > 0:
-                for _ in range(2):
-                    possible_moves.append((self.whereIsFront[0] + self.coord[0], self.whereIsFront[1] + self.coord[1]))
-            if b_dist > 0:
-                for _ in range(2):
-                    possible_moves.append((-self.whereIsFront[0] + self.coord[0], -self.whereIsFront[1] + self.coord[1]))
-            if r_dist > 0:
-                possible_moves.append((self.whereIsFront[1] + self.coord[0], -self.whereIsFront[0] + self.coord[1]))
+        if b_type == "LightHouse" and b_dist > 0:
+            c = step(back)
+            return c if is_free(c) else self.coord
 
-        elif -135 <= lh_angle < -45:
-            # Farol está à direita
-            if r_dist > 0:
-                for _ in range(6):
-                    possible_moves.append((self.whereIsFront[1] + self.coord[0], -self.whereIsFront[0] + self.coord[1]))
-            if f_dist > 0:
-                for _ in range(2):
-                    possible_moves.append((self.whereIsFront[0] + self.coord[0], self.whereIsFront[1] + self.coord[1]))
-            if b_dist > 0:
-                for _ in range(2):
-                    possible_moves.append((-self.whereIsFront[0] + self.coord[0], -self.whereIsFront[1] + self.coord[1]))
-            if l_dist > 0:
-                possible_moves.append((-self.whereIsFront[1] + self.coord[0], self.whereIsFront[0] + self.coord[1]))
-
+    # 2) Caso contrário, usa o ângulo
+        if -45 <= angle <= 45:
+            preferred = [front, left, right, back]
+        elif 45 < angle <= 135:
+            preferred = [left, front, back, right]
+        elif -135 <= angle < -45:
+            preferred = [right, front, back, left]
         else:
-            # Farol está atrás
-            if b_dist > 0:
-                for _ in range(6):
-                    possible_moves.append((-self.whereIsFront[0] + self.coord[0], -self.whereIsFront[1] + self.coord[1]))
-            if l_dist > 0:
-                for _ in range(2):
-                    possible_moves.append((-self.whereIsFront[1] + self.coord[0], self.whereIsFront[0] + self.coord[1]))
-            if r_dist > 0:
-                for _ in range(2):
-                    possible_moves.append((self.whereIsFront[1] + self.coord[0], -self.whereIsFront[0] + self.coord[1]))
-            if f_dist > 0:
-                possible_moves.append((self.whereIsFront[0] + self.coord[0], self.whereIsFront[1] + self.coord[1]))
+            preferred = [back, left, right, front]
 
-                
-        return random.choice(possible_moves) if possible_moves else self.coord
+        for d in preferred:
+            c = step(d)
+            if is_free(c):
+                return c
+
+    # 3) Fica parado se não houver alternativa
+        return self.coord
+
             
 
 
