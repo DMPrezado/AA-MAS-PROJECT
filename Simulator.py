@@ -11,10 +11,8 @@ from Conf import ConfigLightHouse as Conf
 
 class Simulator:
     def __init__(self):
-
-
         # # --------------------------
-        # # CONFIG DO MAPA
+        # # Init do ambiente a partir do ficheiro de mapas
         # # --------------------------
         self.ambient = Ambient.from_txt(Conf.FILE_EPISODES_INITIAL_POSITIONS)
 
@@ -26,12 +24,15 @@ class Simulator:
         # --------------------------
         # 1) TREINO
         # --------------------------
-        if Conf.MOVE_WITH_QLEARNING:
-            self.treinar()
+        self.treinar()
         # --------------------------
         # 2) TESTE (muitos testes + render a cada passo)
         # --------------------------
         self.testar()
+        # --------------------------
+        # 3) Plot dos resultados da aprendizagem e dos testes.
+        # --------------------------
+        #TODO: implementar plotagem dos resultados
         
         
     def reset_agent_random(self, ambient, agent):
