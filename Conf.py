@@ -21,7 +21,7 @@ class ConfigLightHouse:
     # ------------------------
     # TRAINING PARAMETERS
     # ------------------------
-    NUMBER_EPISODES = 20
+    NUMBER_EPISODES = 200
     MAX_STEPS_PER_EPISODE = 100
     RENDER_DURING_TRAINING = False
 
