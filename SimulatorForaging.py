@@ -13,8 +13,6 @@ class ForagingSimulator:
         start_pos = random.choice(self.ambient.freePositions())
         self.agent = ForagingAgent("F0", self.ambient, start_pos)
 
-        # inicializa render window
-        self.ambient.init_render_window()
 
         # Só treina se estiver em Q-learning
         if Conf.MOVE_WITH_QLEARNING:
@@ -77,7 +75,6 @@ class ForagingSimulator:
         N_TEST = 2
         total = 0
 
-        self.ambient.init_render_window()
 
         for i in range(N_TEST):
             self.ambient = ForagingAmbient.from_txt(Conf.FILE_EPISODES_MAP)
