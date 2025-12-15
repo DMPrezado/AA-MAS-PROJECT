@@ -10,15 +10,17 @@ class ForagingSimulator:
     def __init__(self):
         self.ambient = ForagingAmbient.from_txt(Conf.FILE_EPISODES_MAP)
 
-        # spawn do agente
-        if hasattr(self.ambient, "agent_spawns") and self.ambient.agent_spawns:
-            start_pos = random.choice(self.ambient.agent_spawns)
-        else:
-            start_pos = random.choice(self.ambient.freePositions())
-
+        start_pos = random.choice(self.ambient.freePositions())
         self.agent = ForagingAgent("F0", self.ambient, start_pos)
 
-        self.treinar()
+        # Só treina se estiver em Q-learning
+        if Conf.MOVE_WITH_QLEARNING:
+            self.treinar()
+        else:
+            print("=== FIXED POLICY: sem treino ===")
+            qlearning.EPSILON = 0.0  # não influencia fixed, mas deixa consistente
+
+        # Teste (sempre)
         self.testar()
 
     def reset_episode(self):
