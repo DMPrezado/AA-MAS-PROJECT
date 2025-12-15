@@ -21,135 +21,272 @@
 #                   moveTo(Coord) : Void    ##recebe uma reward pelo movimento executado
 
 
+# Agent.py
 import math
-import pygad
 import random
 import Coord
+from Entity import Entity
+from LightHouse import LightHouse
+from Obstacle import Obstacle
+from qlearning import ACTIONS, choose_action, update_Q
+from Conf import ConfigLightHouse as Conf
 
-class Agent:
-    def __init__(self, name, ambient):
+
+
+class Agent(Entity):
+    def __init__(self, name, ambient, pos):
+        super().__init__(pos)
+        self.type = "Agent"
         self.name = name
-        self.finished_flag = False
         self.ambient = ambient
-        freePositions = self.ambient.freePositions()
-        self.coord = freePositions[random.randint(0, len(freePositions)-1)]
-        self.ambient.occupiedPositions.add(self.coord)
+
+        self.finished_flag = False
+        self.fitness = 0
+
+        self.whereIsFront = (0, -1)
+        self.movable = True
+
+        self.last_state = None
+        self.last_action = None
+
+        self.ambient.agents.append(self)
+        self.ambient.occupiedPositions.add(self.coord.as_tuple())
+
+
+    def getObject(self, coord):
+        for o in self.ambient.obstacles:
+            if o.getCoord().as_tuple() == coord.as_tuple():
+                return o
+        for a in self.ambient.agents:
+            if a.getCoord().as_tuple() == coord.as_tuple():
+                return a
+        for lh in [self.ambient.lighthouse]:
+            if lh.getCoord().as_tuple() == coord.as_tuple():
+                return lh
+        return None
+
+    # ---------- sensores ----------
+    def _sense_in_direction(self, direction):
+        dx, dy = direction
+        steps = 0
+        current = self.coord
+
+        while True:
+            current = current + (dx, dy)
+            obj = self.ambient.getObject(current)
+
+            if obj is None:
+                steps += 1
+                continue
+
+            obj_type = getattr(obj, "type", None)
+
+            if isinstance(obj, LightHouse):
+                obj_type = "LightHouse"
+            elif isinstance(obj, Obstacle):
+                obj_type = obj.getType()
+            elif hasattr(obj, "movable") and obj.movable:
+                obj_type = "Agent"
+            elif obj_type is None:
+                obj_type = "Other"
+
+            return (steps, obj_type)
+
+    def sensorFront(self):
+        return self._sense_in_direction(self.whereIsFront)
+
+    def sensorBack(self):
+        fx, fy = self.whereIsFront
+        return self._sense_in_direction((-fx, -fy))
+
+    def sensorLeft(self):
+        fx, fy = self.whereIsFront
+        return self._sense_in_direction((-fy, fx))
+
+    def sensorRight(self):
+        fx, fy = self.whereIsFront
+        return self._sense_in_direction((fy, -fx))
+
+    def sensorDirection(self):
+        ax, ay = self.coord.x, self.coord.y
+        lh = self.ambient.getLightHouse().getCoord()
+        lx, ly = lh.x, lh.y
+
+        angle = math.degrees(math.atan2(ly - ay, lx - ax)) + 90
+        angle = (angle + 180) % 360 - 180
+        return angle
+
+
+    # ---------- estado ----------
+    def get_state(self):
+        code = {
+            None: 0,
+            "LightHouse": 1,
+            "Wall": 2,
+            "Fireplace": 3,
+            "Limit": 4,
+            "Border": 4,
+            "Agent": 5,
+            "Other": 6,
+        }
+
+        def bucket(d):
+            if d == 0: return 0
+            if d == 1: return 1
+            if d <= 3: return 2
+            return 3
+
+        f_dist, f_type = self.sensorFront()
+        b_dist, b_type = self.sensorBack()
+        l_dist, l_type = self.sensorLeft()
+        r_dist, r_type = self.sensorRight()
+        lh_angle       = self.sensorDirection()
+
+
+        return (
+            code.get(f_type, 6), bucket(f_dist),
+            code.get(b_type, 6), bucket(b_dist),
+            code.get(l_type, 6), bucket(l_dist),
+            code.get(r_type, 6), bucket(r_dist),
+            lh_angle
+        )
+
+    def distance_to_lighthouse(self):
+        ax, ay = self.coord.x, self.coord.y
+        lh = self.ambient.getLightHouse().getCoord()
+        lx, ly = lh.x, lh.y
+        return math.sqrt((lx - ax) ** 2 + (ly - ay) ** 2)
+
+    # ---------- decisão (aprendizagem) ----------
+    def movementChoice(self):
+        state = self.get_state()
+        action = choose_action(state)
+
+        self.last_state = state
+        self.last_action = action
+
+        dx, dy = ACTIONS[action]
+        return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
+
+    # ---------- execução + recompensa + update Q ----------
+    def moveTo(self, newCoord):
+        old_dist = self.distance_to_lighthouse()
+        obj = self.ambient.getObject(newCoord)
+        reward = 0
+
+        # fora do mapa -> tratei como parede (se no vosso enunciado houver valor próprio, mete aqui)
+        if obj is not None and getattr(obj, "type", None) == "Limit":
+            reward = -30
+
+        elif isinstance(obj, Obstacle):
+            t = obj.getType()
+            if t == "Wall":
+                reward = Conf.REWARD_HIT_WALL
+
+            elif t == "Fireplace":
+                reward = Conf.REWARD_IN_FIREPLACE
+
+            else:
+                reward = Conf.REWARD_HIT_OBJECT
+
+        else:
+            # livre ou farol
+            self.ambient.occupiedPositions.discard(self.coord.as_tuple())
+            self.coord = newCoord
+            self.ambient.occupiedPositions.add(self.coord.as_tuple())
+
+            lh = self.ambient.getLightHouse().getCoord()
+            if self.coord.as_tuple() == lh.as_tuple():
+                reward = Conf.REWARD_REACH_GOAL
+                self.finished_flag = True
+            else:
+                new_dist = self.distance_to_lighthouse()
+                if new_dist < old_dist:
+                    reward = Conf.REWARD_STEP_CLOSER
+                else:
+                    reward = Conf.REWARD_STEP_AWAY
+
+        self.fitness += reward
+
+        if self.last_state is not None and self.last_action is not None:
+            next_state = self.get_state()
+            update_Q(self.last_state, self.last_action, reward, next_state)
+
+
+
 
     def executar(self):
-        sensorDataFront = self.sensorFront()
-        sensorDataBack = self.sensorBack()
-        sensorDataLeft = self.sensorLeft()
-        sensorDataRight = self.sensorRight()
-        sensorDataDirection = self.sensorDirection()
-        moveCoord = self.movementChoice(sensorDataFront, sensorDataBack, sensorDataLeft, sensorDataRight, sensorDataDirection)
+        if Conf.MOVE_WITH_QLEARNING:
+            moveCoord = self.movementChoice()
+
+        elif Conf.MOVE_WITH_FIXED_POLICIES:
+            moveCoord = self.fixedPolicyChoice()
+
+        else:
+            raise ValueError(
+            "Config inválida: escolhe 'fixed' ou 'qlearning' no Conf.py"
+        )
+
         self.moveTo(moveCoord)
 
 
 
-    def sensorFront(self):
-        result = (0, None)
-        direction = self.whereIsFront
-        while True:
-            sensorCoord = self.coord + direction
-            if sensorCoord in self.freePositions:
-                result._1 += 1
-            else:
-                result._2 = self.ambient.getObject(sensorCoord).type
-                break
-        return result
-        
-    def sensorBack(self):
-        result = (0, None)
-        direction = (self.whereIsFront[0] * -1, self.whereIsFront[1] * -1)
-        while True:
-            sensorCoord = self.coord + direction
-            if sensorCoord in self.freePositions:
-                result._1 += 1
-            else:
-                result._2 = self.ambient.getObject(sensorCoord).type
-                break
-        return result
-        
-    def sensorLeft(self):
-        result = (0, None)
-        direction = (-self.whereIsFront[1], self.whereIsFront[0])
-        while True:
-            sensorCoord = self.coord + direction
-            if sensorCoord in self.freePositions:
-                result._1 += 1
-            else:
-                result._2 = self.ambient.getObject(sensorCoord).type
-                break
-        return result
-    
-    def sensorRight(self):
-        result = (0, None)
-        direction = (self.whereIsFront[1], -self.whereIsFront[0])
-        while True:
-            sensorCoord = self.coord + direction
-            if sensorCoord in self.freePositions:
-                result._1 += 1
-            else:
-                result._2 = self.ambient.getObject(sensorCoord).type
-                break
-        return result
-    
 
-    def sensorDirection(self):
-        ax, ay = self.coord
-        lx, ly = self.ambient.getLightHouse().getCoord()
-        return math.degrees(math.atan2(ly - ay, lx - ax))
+    def fixedPolicyChoice(self):
+        f_dist, f_type = self.sensorFront()
+        b_dist, b_type = self.sensorBack()
+        l_dist, l_type = self.sensorLeft()
+        r_dist, r_type = self.sensorRight()
+        angle = self.sensorDirection()
 
-    def movementChoice(self, sensorDataFront, sensorDataBack, sensorDataLeft, sensorDataRight, sensorDataDirection):
-        # Placeholder for movement choice logic using sensor data
-        # This should interface with a learning algorithm to decide the next move
-        #
-        #
-        #
-        #
+        front = self.whereIsFront
+        back  = (-front[0], -front[1])
+        left  = (-front[1], front[0])
+        right = (front[1], -front[0])
 
+        def step(direction):
+            dx, dy = direction
+            return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
 
-        possibleMoves = [
-            Coord.Coord(self.coord.x + 1, self.coord.y),  # Move Right
-            Coord.Coord(self.coord.x - 1, self.coord.y),  # Move Left
-            Coord.Coord(self.coord.x, self.coord.y + 1),  # Move Down
-            Coord.Coord(self.coord.x, self.coord.y - 1)   # Move Up
-        ]
-        # Filter possible moves to only include free positions
-        freeMoves = [move for move in possibleMoves if move in self.ambient.freePositions()]
-        if freeMoves:
-            return random.choice(freeMoves)
+        def is_free(c):
+            obj = self.ambient.getObject(c)
+            return (obj is None) or isinstance(obj, LightHouse)
+
+    # 1) Se o farol estiver visível, ir direto
+        if f_type == "LightHouse" and f_dist > 0:
+            c = step(front)
+            return c if is_free(c) else self.coord
+
+        if l_type == "LightHouse" and l_dist > 0:
+            c = step(left)
+            return c if is_free(c) else self.coord
+
+        if r_type == "LightHouse" and r_dist > 0:
+            c = step(right)
+            return c if is_free(c) else self.coord
+
+        if b_type == "LightHouse" and b_dist > 0:
+            c = step(back)
+            return c if is_free(c) else self.coord
+
+    # 2) Caso contrário, usa o ângulo
+        if -45 <= angle <= 45:
+            preferred = [front, left, right, back]
+        elif 45 < angle <= 135:
+            preferred = [left, front, back, right]
+        elif -135 <= angle < -45:
+            preferred = [right, front, back, left]
         else:
-            return self.coord  # No move possible, stay in place
+            preferred = [back, left, right, front]
 
-    def moveTo(self, newCoord):
-        oldCoord = self.coord
-        if newCoord in self.ambient.freePositions():
-            self.ambient.occupiedPositions.remove(self.coord.as_tuple())
-            self.coord = newCoord
-            self.ambient.occupiedPositions.add(self.coord.as_tuple())
-            self.updateFitness(newCoord, oldCoord)
-        else:
-            obj = self.ambient.getObject(newCoord)
-            obj_type = getattr(obj, "type", None)
+        for d in preferred:
+            c = step(d)
+            if is_free(c):
+                return c
 
-            if obj_type == 'Wall':
-                self.fitness -= 20
-            elif obj_type == 'Fireplace':
-                self.fitness -= 10
-            elif obj_type in ('Limit', 'Border'):
-                self.fitness -= 25
-            # Penalize for invalid move
-        
-    def getLightHouseDistance(self):
-        ax, ay = self.coord.x, self.coord.y
-        lx, ly = self.ambient.getLightHouse().getCoord().x, self.ambient.getLightHouse().getCoord().y
-        return math.sqrt((lx - ax) ** 2 + (ly - ay) ** 2)
-    
-    def updateFitness(self, newCoord, oldCoord):
-        oldDistance = self.getLightHouseDistance(oldCoord)
-        newDistance = self.getLightHouseDistance(newCoord)
-        if newDistance < oldDistance:
-            self.fitness += 10  # Reward for moving closer
-        else:
-            self.fitness -= 15  # Penalty for moving away
+    # 3) Fica parado se não houver alternativa
+        return self.coord
+
+            
+
+

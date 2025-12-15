@@ -4,9 +4,13 @@
 #     Methods:
 #         - getCoord() -> Coord
 
-class LightHouse:
-    def __init__(self, coord):
-        self.coord = coord
 
-    def getCoord(self):
-        return self.coord
+# LightHouse.py
+
+from Entity import Entity
+
+class LightHouse(Entity):
+    def __init__(self, coord):
+        super().__init__(coord)
+        self.type = "LightHouse"
+
