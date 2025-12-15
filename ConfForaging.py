@@ -14,7 +14,7 @@ class ConfigForaging:
     # ------------------------
     # TRAINING
     # ------------------------
-    NUMBER_EPISODES = 2000
+    NUMBER_EPISODES = 600
     MAX_STEPS_PER_EPISODE = 120
     RENDER_DURING_TRAINING = False
 

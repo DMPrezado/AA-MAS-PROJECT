@@ -13,18 +13,20 @@ class ForagingSimulator:
         start_pos = random.choice(self.ambient.freePositions())
         self.agent = ForagingAgent("F0", self.ambient, start_pos)
 
+        # inicializa render window
+        self.ambient.init_render_window()
+
         # Só treina se estiver em Q-learning
         if Conf.MOVE_WITH_QLEARNING:
             self.treinar()
         else:
             print("=== FIXED POLICY: sem treino ===")
-            qlearning.EPSILON = 0.0  # não influencia fixed, mas deixa consistente
+            qlearning.EPSILON = 0.0
 
         # Teste (sempre)
         self.testar()
 
     def reset_episode(self):
-        # reposicionar agente
         self.ambient.occupiedPositions.discard(self.agent.coord.as_tuple())
         self.agent.coord = random.choice(self.ambient.freePositions())
         self.ambient.occupiedPositions.add(self.agent.coord.as_tuple())
@@ -38,17 +40,14 @@ class ForagingSimulator:
         self.agent.last_state = None
         self.agent.last_action = None
 
-        # NOTA: aqui não estamos a “resetar” recursos; se quiseres episódios independentes,
-        # podes recarregar o mapa a cada episódio.
-        # Para já mantemos simples e determinístico.
-
     def run_episode(self, max_steps, render=False, delay=0.08):
         for t in range(max_steps):
             self.agent.executar()
 
-            if render:
-                print(f"\nStep {t} | fitness={self.agent.fitness} | has_resource={self.agent.has_resource} | dir={self.agent.whereIsFront}")
-                print(self.ambient.render())
+            if render and hasattr(self.ambient, "root") and self.ambient.root.winfo_exists():
+                self.ambient.render_window()
+                self.ambient.root.update_idletasks()
+                self.ambient.root.update()
                 time.sleep(delay)
 
         return self.agent.fitness
@@ -56,9 +55,8 @@ class ForagingSimulator:
     def treinar(self):
         print("=== TREINO FORAGING ===")
         for ep in range(Conf.NUMBER_EPISODES):
-            # para episódios “limpos” com recursos repostos, o melhor é recarregar o mapa:
+            # recarregar mapa para episódios limpos
             self.ambient = ForagingAmbient.from_txt(Conf.FILE_EPISODES_MAP)
-            # re-ligar agente ao novo ambiente
             self.ambient.agents = []
             start = random.choice(self.ambient.freePositions())
             self.agent = ForagingAgent("F0", self.ambient, start)
@@ -72,7 +70,6 @@ class ForagingSimulator:
             if ep % 25 == 0:
                 print(f"Ep {ep:3d} | fitness={fit:7.1f} | epsilon={qlearning.EPSILON:.3f}")
 
-
     def testar(self):
         print("\n=== TESTE FORAGING (policy aprendida) ===")
         qlearning.EPSILON = 0.0
@@ -80,20 +77,23 @@ class ForagingSimulator:
         N_TEST = 2
         total = 0
 
+        self.ambient.init_render_window()
+
         for i in range(N_TEST):
             self.ambient = ForagingAmbient.from_txt(Conf.FILE_EPISODES_MAP)
             self.ambient.agents = []
             start = random.choice(self.ambient.freePositions())
             self.agent = ForagingAgent("F0", self.ambient, start)
 
+            self.ambient.init_render_window()
             print(f"\n--- TESTE {i+1}/{N_TEST} ---")
-            print(self.ambient.render())
             fit = self.run_episode(max_steps=Conf.MAX_STEPS_PER_EPISODE, render=True, delay=0.08)
             total += fit
             print(f"Resultado: fitness={fit}")
 
         print("\n=== RESUMO TESTES ===")
         print(f"Fitness média: {total / N_TEST:.2f}")
+
 
 if __name__ == "__main__":
     ForagingSimulator()
