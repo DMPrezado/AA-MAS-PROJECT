@@ -20,6 +20,8 @@ class Simulator:
         start_pos = random.choice(self.ambient.freePositions())
         self.agent = Agent("A0", self.ambient, start_pos)
 
+        self.FITNESS_HISTORY = []
+
 
         # --------------------------
         # 1) TREINO
@@ -33,6 +35,7 @@ class Simulator:
         # 3) Plot dos resultados da aprendizagem e dos testes.
         # --------------------------
         #TODO: implementar plotagem dos resultados
+        self.plot_results()
         
         
     def reset_agent_random(self, ambient, agent):
@@ -76,6 +79,9 @@ class Simulator:
                 render_each_step=Conf.RENDER_DURING_TRAINING
             )
 
+            ##Guardar Fitness
+            self.FITNESS_HISTORY.append(fit)
+
             # decair exploração
             qlearning.decay_epsilon()
 
@@ -118,6 +124,19 @@ class Simulator:
         print("\n=== RESUMO TESTES ===")
         print(f"Chegou ao farol: {wins}/{N_TEST}")
         print(f"Fitness média: {total_fitness / N_TEST:.2f}")
+
+
+    def plot_results(self):
+        import matplotlib.pyplot as plt
+
+        plt.plot(self.FITNESS_HISTORY)
+        plt.title("Fitness ao longo dos episódios de treino")
+        plt.xlabel("Episódio")
+        plt.ylabel("Fitness")
+        plt.grid()
+        plt.show()
+
+
 
 
 if __name__ == "__main__":

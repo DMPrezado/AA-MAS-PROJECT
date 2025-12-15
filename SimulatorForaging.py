@@ -13,6 +13,8 @@ class ForagingSimulator:
         start_pos = random.choice(self.ambient.freePositions())
         self.agent = ForagingAgent("F0", self.ambient, start_pos)
 
+        self.FITNESS_HISTORY = []
+
 
         # Só treina se estiver em Q-learning
         if Conf.MOVE_WITH_QLEARNING:
@@ -23,6 +25,8 @@ class ForagingSimulator:
 
         # Teste (sempre)
         self.testar()
+
+        self.plot_results()
 
     def reset_episode(self):
         self.ambient.occupiedPositions.discard(self.agent.coord.as_tuple())
@@ -63,6 +67,10 @@ class ForagingSimulator:
                 max_steps=Conf.MAX_STEPS_PER_EPISODE,
                 render=Conf.RENDER_DURING_TRAINING
             )
+
+            #gaurda fitness
+            self.FITNESS_HISTORY.append(fit)
+
             qlearning.decay_epsilon()
 
             if ep % 25 == 0:
@@ -90,6 +98,16 @@ class ForagingSimulator:
 
         print("\n=== RESUMO TESTES ===")
         print(f"Fitness média: {total / N_TEST:.2f}")
+
+    def plot_results(self):
+        import matplotlib.pyplot as plt
+
+        plt.plot(self.FITNESS_HISTORY)
+        plt.title("Fitness ao longo dos episódios de treino")
+        plt.xlabel("Episódio")
+        plt.ylabel("Fitness")
+        plt.grid()
+        plt.show()
 
 
 if __name__ == "__main__":
