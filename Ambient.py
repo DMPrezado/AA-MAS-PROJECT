@@ -3,6 +3,7 @@
 import Coord
 from LightHouse import LightHouse
 from Obstacle import Obstacle
+import tkinter as tk
 
 class Ambient:
     def __init__(self, grid_size, lighthouse=None, obstacles=None, agents=None):
@@ -27,6 +28,8 @@ class Ambient:
         for a in self.agents:
             self.occupiedPositions.add(a.getCoord().as_tuple())
 
+
+
     # --------------------------
     # GETTERS
     # --------------------------
@@ -35,6 +38,10 @@ class Ambient:
 
     def getAgentsList(self):
         return self.agents
+
+
+
+
 
     # --------------------------
     # POSIÇÕES LIVRES
@@ -49,6 +56,9 @@ class Ambient:
                     free_positions.append(Coord.Coord(x, y))
         return free_positions
 
+
+
+
     # --------------------------
     # UTIL: coord -> tuple
     # --------------------------
@@ -59,6 +69,9 @@ class Ambient:
             return coord
         else:
             raise TypeError("coord deve ser Coord ou (x,y)")
+
+
+
 
     # --------------------------
     # OBJETO NUMA POSIÇÃO
@@ -90,6 +103,9 @@ class Ambient:
 
         return None
 
+
+
+
     # --------------------------
     # RENDER
     # --------------------------
@@ -120,6 +136,87 @@ class Ambient:
             grid[c.getY()][c.getX()] = "\033[92mA\033[0m"
 
         return "\n".join(" ".join(row) for row in grid)
+        
+    # --------------------------
+    # RENDER GRÁFICO COM TKINTER
+    # --------------------------
+
+    def render_window(self):
+        if not hasattr(self, "root") or not self.root.winfo_exists():
+            return
+
+        self.canvas.delete("all")
+        c = self.CELL
+        width, height = self.grid_size
+
+        def draw_cell(x, y, color, text=None):
+            self.canvas.create_rectangle(
+                x*c, y*c, (x+1)*c, (y+1)*c,
+                fill=color, outline="gray"
+            )
+            if text:
+                self.canvas.create_text(
+                    x*c + c/2, y*c + c/2,
+                    text=text, font=("Arial", 12, "bold")
+                )
+
+        # fundo
+        for y in range(height):
+            for x in range(width):
+                draw_cell(x, y, "white")
+
+        # obstáculos
+        for o in self.obstacles:
+            coord = o.getCoord()
+            t = o.getType()
+            color = {
+                "Wall": "black",
+                "Fireplace": "orange",
+                "Limit": "gray",
+                "Border": "gray"
+            }.get(t, "brown")
+            draw_cell(coord.getX(), coord.getY(), color)
+
+        # farol
+        if self.lighthouse:
+            c0 = self.lighthouse.getCoord()
+            draw_cell(c0.getX(), c0.getY(), "yellow", "L")
+
+        # agentes
+        for a in self.agents:
+            c0 = a.getCoord()
+            draw_cell(c0.getX(), c0.getY(), "lightgreen", "A")
+
+
+    def init_render_window(self):
+        import tkinter as tk
+
+        if hasattr(self, "root") and self.root.winfo_exists():
+            return   # JÁ EXISTE → não cria outra
+
+        self.window_closed = False
+        self.CELL = 30
+        w, h = self.grid_size
+
+        self.root = tk.Tk()
+        self.root.title("Grid")
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self.canvas = tk.Canvas(
+            self.root,
+            width=w * self.CELL,
+            height=h * self.CELL,
+            bg="white"
+        )
+        self.canvas.pack()
+
+    def _on_close(self):
+        self.window_closed = True
+        self.root.destroy()
+
+
+
+
 
     # ==========================================================
     #      CRIAÇÃO DO MAPA DENTRO DO AMBIENTE
@@ -194,3 +291,6 @@ class Ambient:
         ]
 
         return Ambient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])
+    
+
+

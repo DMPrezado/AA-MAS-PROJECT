@@ -47,14 +47,15 @@ class Simulator:
         agent.fitness = 0
 
     def run_episode(self, ambient, agent, max_steps=80, render_each_step=False, delay=0.1):
-        """Executa 1 episódio e devolve (steps_usados, fitness_final, chegou_ao_farol)."""
         for t in range(max_steps):
             agent.executar()
 
-            if render_each_step:
-                print(f"\nStep {t} | fitness={agent.fitness}")
-                print(ambient.render())
+            if render_each_step and hasattr(self.ambient, "root") and self.ambient.root.winfo_exists():
+                self.ambient.render_window()
+                self.ambient.root.update_idletasks()
+                self.ambient.root.update()
                 time.sleep(delay)
+
 
             if agent.finished_flag:
                 return (t + 1, agent.fitness, True)
@@ -94,12 +95,14 @@ class Simulator:
         total_fitness = 0
         wins = 0
 
+        self.ambient.init_render_window()
+
         for test_i in range(N_TEST):
             self.reset_agent_random(self.ambient, self.agent)
 
             print(f"\n--- TESTE {test_i+1}/{N_TEST} ---")
-            print("Estado inicial:")
-            print(self.ambient.render())
+            # print("Estado inicial:")
+            # print(self.ambient.render())
             steps, fit, done = self.run_episode(
                 self.ambient, self.agent,
                 max_steps=MAX_STEPS_TEST,
