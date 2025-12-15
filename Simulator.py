@@ -80,7 +80,7 @@ class Simulator:
 
             # log de vez em quando
             if ep % 20 == 0:
-                print(f"Ep {ep:3d} | done={done} | steps={steps:2d} | fitness={fit:4d} | epsilon={qlearning.EPSILON:.3f} | Q={len(qlearning.Q)}")
+                print(f"Ep {ep:3d} | done={done} | steps={steps:2d} | fitness={fit:4d} | epsilon={qlearning.EPSILON:.3f} | Q={len(qlearning.Q_TABLES["lighthouse"])}")
 
     def testar(self):
         print("\n=== TESTE (policy aprendida) ===")
