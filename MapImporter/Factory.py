@@ -1,6 +1,6 @@
 # factory.py
-from Registry import TILE_REGISTRY
+from MapImporter.Registry import TILE_REGISTRY
 
-def create_tile(char):
+def create_tile(char, coord):
     cls = TILE_REGISTRY.get(char)
-    return cls() if cls else None
+    return cls(coord) if cls else None
