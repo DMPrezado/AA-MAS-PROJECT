@@ -1,6 +1,7 @@
-from Registry import register
+from MapImporter.Registry import register
 
 
-@register("T")
+@register("A")
 class Agent:
-    pass
+    def __init__(self, coord):
+        self.coord = coord

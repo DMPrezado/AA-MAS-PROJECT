@@ -1,4 +1,12 @@
 
+import MapImporter.Reader as Reader
+import Ambient
+
+
+'''
+    Maps escolhido aqui -> passar para o configuration.py
+'''
+
 
 
 class Simulator:
@@ -8,11 +16,14 @@ class Simulator:
         # --------------------------
         # Init do ambiente a partir do ficheiro de mapas
         # --------------------------
-        
+        ## o mapa é generico aqui. o escolhido depende dos modos no configuration.py
+        elementsList, gridDimensions =  Reader.read_map("Maps/foraging_map.txt")
+        self.ambient = Ambient(elementsList, gridDimensions)
         
         # --------------------------
         # cria 1 agente
         # --------------------------
+        
         
         
         

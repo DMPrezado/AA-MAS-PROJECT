@@ -1,5 +1,5 @@
 BBBBBBBBBBBBB
-B..........FB
+B.......A..FB
 B..F.W......B
 B....W.WWW..B
 B.WW.W......B
