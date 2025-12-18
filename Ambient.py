@@ -1,7 +1,7 @@
 
 
 from Agent import Agent
-from Entities import LightHouse
+from Entities import LightHouse, Nest
 
 
 class Ambient:
@@ -11,7 +11,9 @@ class Ambient:
         self.occupied_positions = self.set_occupied_positions()
         self.agent = self.set_agent()
         self.lighthouse = self.set_lighthouse()
-#        self.nests = self.set_nests()
+        self.nest = self.set_nest()
+        
+
         
         
     # ----------------------
@@ -27,15 +29,18 @@ class Ambient:
         for element in self.elements_list:
             if isinstance(element, Agent):
                 return element
-        raise RuntimeError("Agent not found")
+        return None
     
     def set_lighthouse(self):
         for element in self.elements_list:
             if isinstance(element, LightHouse):
                 return element
-        raise RuntimeError("LightHouse not found")
 
-
+    def set_nest(self):
+        for element in self.elements_list:
+            if isinstance(element, Nest):
+                return element
+        
 
 
     # ----------------------
@@ -63,10 +68,7 @@ class Ambient:
 
         # fora da grelha
         if coord.x < 0 or coord.y < 0 or coord.x > width or coord.y > height:
-            class LimitObj:
-                type = "Limit"
-                def getType(self): return "Limit"
-            return LimitObj()
+            return "Limit"
 
         for element in self.elements_list:
             if element.coord.equals(coord):
