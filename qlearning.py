@@ -101,38 +101,3 @@ class qlearning:
 
     def reset_task(task: str):
         Q_TABLES[task] = {}
-        
-        
-        
-    def get_state(agent):
-        code = {
-            None: 0,
-            "LightHouse": 1,
-            "Wall": 2,
-            "Fireplace": 3,
-            "Limit": 4,
-            "Border": 4,
-            "Agent": 5,
-            "Other": 6,
-        }
-
-        def bucket(d):
-            if d == 0: return 0
-            if d == 1: return 1
-            if d <= 3: return 2
-            return 3
-
-        f_dist, f_type = agent.sensorFront()
-        b_dist, b_type = agent.sensorBack()
-        l_dist, l_type = agent.sensorLeft()
-        r_dist, r_type = agent.sensorRight()
-        lh_angle       = agent.sensorDirection()
-
-
-        return (
-            code.get(f_type, 6), bucket(f_dist),
-            code.get(b_type, 6), bucket(b_dist),
-            code.get(l_type, 6), bucket(l_dist),
-            code.get(r_type, 6), bucket(r_dist),
-            lh_angle
-        )

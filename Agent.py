@@ -1,7 +1,9 @@
+import Entities
 from MapImporter.Registry import register
 import math
 import Configuration as Conf
-from qlearning import qlearning
+
+from qlearning import ACTIONS, choose_action, update_Q
 
 
 MOVEMENTS={
@@ -18,7 +20,6 @@ class Agent:
         self.ambient = ambient
         self.finished_flag = False
         self.fitness = 0
-        self.qlearning = qlearning()
     
     def set_ambient(self, ambient):
         self.ambient = ambient
@@ -77,11 +78,8 @@ class Agent:
         reward = 0
 
         # fora do mapa -> tratei como parede (se no vosso enunciado houver valor próprio, mete aqui)
-        if obj is not None and obj == "Limit":
-            reward = -30
-
-        elif :
-            
+        if obj is not None and obj.isObstacle:
+            reward = obj.reward
 
         else:
             # livre ou farol
@@ -91,14 +89,14 @@ class Agent:
 
             lh = self.ambient.getLightHouse().getCoord()
             if self.coord.as_tuple() == lh.as_tuple():
-                reward = Conf.REWARD_REACH_GOAL
+                reward = obj.reward
                 self.finished_flag = True
             else:
                 new_dist = self.distance_to_lighthouse()
                 if new_dist < old_dist:
-                    reward = Conf.REWARD_STEP_CLOSER
+                    reward = obj.REWARD_STEP_CLOSER
                 else:
-                    reward = Conf.REWARD_STEP_AWAY
+                    reward = obj.REWARD_STEP_AWAY
 
         self.fitness += reward
 
@@ -106,4 +104,7 @@ class Agent:
             next_state = self.get_state()
             update_Q(self.last_state, self.last_action, reward, next_state)
 
+
+
+    
     

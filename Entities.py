@@ -16,6 +16,9 @@ class LightHouse:
     def __init__(self,coord):
         self.coord = coord
         self.reward = 100
+        self.obstacle = False
+        self.REWARD_STEP_CLOSER = 10
+        self.REWARD_STEP_AWAY = -15
 
 
 # -----------------------
@@ -26,12 +29,14 @@ class Nest:
     def __init__(self,coord):
         self.coord = coord
         self.reward = 100
+        self.obstacle = False
 
 @register("R")
 class Resource:
     def __init__(self,coord):
         self.coord = coord
         self.reward = 50
+        self.obstacle = False
 
 
 
@@ -43,12 +48,14 @@ class Wall:
     def __init__(self,coord):
         self.coord = coord
         self.reward = -10
+        self.obstacle = True
 
 @register("F")
 class Fireplace:
     def __init__(self,coord):
         self.coord = coord
         self.reward = -20
+        self.obstacle = True
 
 
 
