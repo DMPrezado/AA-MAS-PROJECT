@@ -3,11 +3,14 @@
 #         - coord: Coord
 #     Methods:
 #         - getCoord() -> Coord
+
+
+# LightHouse.py
+
 from Entity import Entity
 
 class LightHouse(Entity):
     def __init__(self, coord):
-        self.coord = coord
+        super().__init__(coord)
+        self.type = "LightHouse"
 
-    def getCoord(self):
-        return self.coord

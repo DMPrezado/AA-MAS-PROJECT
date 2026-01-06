@@ -1,49 +1,38 @@
-import Coord
-from Obstacle import Obstacle
-from LightHouse import LightHouse
-from Agent import Agent
+# Ambient.py
 
+import Coord
+from LightHouse import LightHouse
+from Obstacle import Obstacle
+import tkinter as tk
 
 class Ambient:
-    def __init__(self, agents, obstacles, lighthouse, grid_size):
-        """
-        agents: lista de Agent
-        obstacles: lista de Obstacle (type: 'Wall', 'Fireplace', 'Limit'/'Border')
-        lighthouse: LightHouse
-        grid_size: (width, height)
-        """
-        self.agents = agents
-        self.obstacles = obstacles
-        self.lighthouse = lighthouse
+    def __init__(self, grid_size, lighthouse=None, obstacles=None, agents=None):
         self.grid_size = grid_size  # (width, height)
+        self.lighthouse = lighthouse
+        self.obstacles = obstacles if obstacles is not None else []
+        self.agents = agents if agents is not None else []
 
-        # posições ocupadas por qualquer coisa dentro da grelha
+        # posições ocupadas
         self.occupiedPositions = set()
+        self._rebuild_occupied()
 
-        for agent in agents:
-            self.occupiedPositions.add(agent.getCoord().as_tuple())
+    def _rebuild_occupied(self):
+        self.occupiedPositions.clear()
 
-        for obstacle in obstacles:
-            self.occupiedPositions.add(obstacle.getCoord().as_tuple())
+        for o in self.obstacles:
+            self.occupiedPositions.add(o.getCoord().as_tuple())
 
-        if lighthouse is not None:
-            self.occupiedPositions.add(lighthouse.getCoord().as_tuple())
+        if self.lighthouse is not None:
+            self.occupiedPositions.add(self.lighthouse.getCoord().as_tuple())
 
-
-
-    def freePositions(self):
-        free_positions = []
-        width, height = self.grid_size
-
-        for x in range(width):
-            for y in range(height):
-                if (x, y) not in self.occupiedPositions:
-                    free_positions.append(Coord.Coord(x, y))
-
-        return free_positions
+        for a in self.agents:
+            self.occupiedPositions.add(a.getCoord().as_tuple())
 
 
 
+    # --------------------------
+    # GETTERS
+    # --------------------------
     def getLightHouse(self):
         return self.lighthouse
 
@@ -52,6 +41,27 @@ class Ambient:
 
 
 
+
+
+    # --------------------------
+    # POSIÇÕES LIVRES
+    # --------------------------
+    def freePositions(self):
+        free_positions = []
+        width, height = self.grid_size
+
+        for x in range(width):
+            for y in range(height):
+                if (x, y) not in self.occupiedPositions:
+                    free_positions.append(Coord.Coord(x, y))
+        return free_positions
+
+
+
+
+    # --------------------------
+    # UTIL: coord -> tuple
+    # --------------------------
     def _coord_to_tuple(self, coord):
         if isinstance(coord, Coord.Coord):
             return coord.getX(), coord.getY()
@@ -60,22 +70,21 @@ class Ambient:
         else:
             raise TypeError("coord deve ser Coord ou (x,y)")
 
+
+
+
+    # --------------------------
+    # OBJETO NUMA POSIÇÃO
+    # --------------------------
     def getObject(self, coord):
-        """
-        Devolve o objeto (Agent, Obstacle, LightHouse ou um 'objeto limite') numa dada coordenada.
-        Usado pelos sensores e pelo moveTo do Agent.
-        """
         x, y = self._coord_to_tuple(coord)
         width, height = self.grid_size
 
-        # fora dos limites da grelha -> tratar como 'Limit'
+        # fora da grelha
         if x < 0 or y < 0 or x >= width or y >= height:
             class LimitObj:
                 type = "Limit"
-
-                def getType(self):
-                    return "Limit"
-
+                def getType(self): return "Limit"
             return LimitObj()
 
         # farol
@@ -87,132 +96,201 @@ class Ambient:
             if a.getCoord().as_tuple() == (x, y):
                 return a
 
-        # obstáculos (walls, fireplaces, borders)
+        # obstáculos
         for o in self.obstacles:
             if o.getCoord().as_tuple() == (x, y):
                 return o
 
-        # nada nessa posição
         return None
 
 
-    def render(self):
-        """
-        Representação visual da grelha:
-          .  = empty
-          L  = lighthouse
-          A  = agent
-          W  = wall
-          F  = fireplace
-          B  = border / limit (se houver obstaculos deste tipo no interior da grelha)
-        """
 
+
+    # --------------------------
+    # RENDER
+    # --------------------------
+    def render(self):
         width, height = self.grid_size
         grid = [['.' for _ in range(width)] for _ in range(height)]
 
-        # obstáculos (Walls, Fireplaces, Borders)
         for obstacle in self.obstacles:
             c = obstacle.getCoord()
             x, y = c.getX(), c.getY()
+            t = obstacle.getType() if hasattr(obstacle, "getType") else getattr(obstacle, "type", None)
 
-            # tenta apanhar tipo de várias formas (depende de como implementares Obstacle)
-            if hasattr(obstacle, "getType"):
-                obj_type = obstacle.getType()
+            if t == "Wall":
+                grid[y][x] = "W"
+            elif t == "Fireplace":
+                grid[y][x] = "F"
+            elif t in ("Limit", "Border"):
+                grid[y][x] = "B"
             else:
-                obj_type = getattr(obstacle, "type", None)
+                grid[y][x] = "#"
 
-            if obj_type == "Wall":
-                grid[y][x] = 'W'
-            elif obj_type == "Fireplace":
-                grid[y][x] = 'F'
-            elif obj_type in ("Limit", "Border"):
-                grid[y][x] = 'B'
-            else:
-                # fallback para algum tipo desconhecido
-                grid[y][x] = '#'
-
-        # farol
         if self.lighthouse is not None:
             c = self.lighthouse.getCoord()
-            grid[c.getY()][c.getX()] = 'L'
+            grid[c.getY()][c.getX()] = "L"
+
+        for a in self.agents:
+            c = a.getCoord()
+            grid[c.getY()][c.getX()] = "\033[92mA\033[0m"
+
+        return "\n".join(" ".join(row) for row in grid)
+        
+    # --------------------------
+    # RENDER GRÁFICO COM TKINTER
+    # --------------------------
+
+    def render_window(self):
+        if not hasattr(self, "root") or not self.root.winfo_exists():
+            return
+
+        self.canvas.delete("all")
+        c = self.CELL
+        width, height = self.grid_size
+
+        def draw_cell(x, y, color, text=None):
+            self.canvas.create_rectangle(
+                x*c, y*c, (x+1)*c, (y+1)*c,
+                fill=color, outline="gray"
+            )
+            if text:
+                self.canvas.create_text(
+                    x*c + c/2, y*c + c/2,
+                    text=text, font=("Arial", 12, "bold")
+                )
+
+        # fundo
+        for y in range(height):
+            for x in range(width):
+                draw_cell(x, y, "white")
+
+        # obstáculos
+        for o in self.obstacles:
+            coord = o.getCoord()
+            t = o.getType()
+            color = {
+                "Wall": "black",
+                "Fireplace": "orange",
+                "Limit": "gray",
+                "Border": "gray"
+            }.get(t, "brown")
+            draw_cell(coord.getX(), coord.getY(), color)
+
+        # farol
+        if self.lighthouse:
+            c0 = self.lighthouse.getCoord()
+            draw_cell(c0.getX(), c0.getY(), "yellow", "L")
 
         # agentes
-        for agent in self.agents:
-            c = agent.getCoord()
-            grid[c.getY()][c.getX()] = 'A'
-
-        # string formatada
-        return '\n'.join(' '.join(row) for row in grid)
+        for a in self.agents:
+            c0 = a.getCoord()
+            draw_cell(c0.getX(), c0.getY(), "lightgreen", "A")
 
 
+    def init_render_window(self):
+        import tkinter as tk
+
+        if hasattr(self, "root") and self.root.winfo_exists():
+            return   # JÁ EXISTE → não cria outra
+
+        self.window_closed = False
+        self.CELL = 30
+        w, h = self.grid_size
+
+        self.root = tk.Tk()
+        self.root.title("Grid")
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self.canvas = tk.Canvas(
+            self.root,
+            width=w * self.CELL,
+            height=h * self.CELL,
+            bg="white"
+        )
+        self.canvas.pack()
+
+    def _on_close(self):
+        self.window_closed = True
+        self.root.destroy()
+
+
+
+
+
+    # ==========================================================
+    #      CRIAÇÃO DO MAPA DENTRO DO AMBIENTE
+    # ==========================================================
 
     @staticmethod
     def from_txt(filename):
         """
-        Lê um txt onde:
+        Carrega um mapa ASCII do ficheiro:
           . = empty
           L = lighthouse
           A = agent
           W = wall
           F = fireplace
-          B = border / limit (obstáculo do tipo 'Limit')
-
-        Retorna um objeto Ambient completamente configurado.
+          B = border/limit (obstáculo tipo Limit) [opcional]
         """
-        with open(filename, 'r') as f:
-            raw_lines = [line.rstrip('\n') for line in f if line.strip()]
+        with open(filename, "r", encoding="utf-8") as f:
+            raw_lines = [line.rstrip("\n") for line in f if line.strip()]
 
         if not raw_lines:
-            raise ValueError("O ficheiro está vazio.")
+            raise ValueError("O ficheiro do mapa está vazio.")
 
         height = len(raw_lines)
         width = len(raw_lines[0])
 
-        # verificar se o mapa é retangular
         for line in raw_lines:
             if len(line) != width:
-                raise ValueError("Todas as linhas do mapa precisam ter o mesmo comprimento.")
+                raise ValueError("Mapa não retangular: linhas com comprimentos diferentes.")
 
-        agents_temp = []
         obstacles = []
         lighthouse = None
+        agent_spawns = []
 
-        # ler cada célula da grelha
         for y, line in enumerate(raw_lines):
             for x, ch in enumerate(line):
                 coord = Coord.Coord(x, y)
 
-                if ch == 'W':
+                if ch == "W":
                     obstacles.append(Obstacle(coord, "Wall"))
-                elif ch == 'F':
+                elif ch == "F":
                     obstacles.append(Obstacle(coord, "Fireplace"))
-                elif ch == 'B':
+                elif ch == "B":
                     obstacles.append(Obstacle(coord, "Limit"))
-                elif ch == 'L':
+                elif ch == "L":
                     lighthouse = LightHouse(coord)
-                elif ch == 'A':
-                    agents_temp.append((f"A{x}_{y}", coord))
-                # '.' é vazio → ignora
+                elif ch == "A":
+                    agent_spawns.append(coord)
+                else:
+                    # vazio ou desconhecido
+                    pass
 
-        # criar ambiente vazio (sem agentes ainda)
-        ambient = Ambient([], obstacles, lighthouse, (width, height))
+        ambient = Ambient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])
 
-        # agora criar agentes reais em posições fixas
-        real_agents = []
-        for name, coord in agents_temp:
-            a = Agent(name, ambient)  # se o teu Agent aceitar coord, podes usar Agent(name, ambient, coord)
-            a.coord = coord  # força a coord definida no mapa
-            real_agents.append(a)
-
-        # atualizar agentes e posições ocupadas
-        ambient.agents = real_agents
-        ambient.occupiedPositions = set()
-
-        for o in obstacles:
-            ambient.occupiedPositions.add(o.getCoord().as_tuple())
-        if lighthouse:
-            ambient.occupiedPositions.add(lighthouse.getCoord().as_tuple())
-        for a in real_agents:
-            ambient.occupiedPositions.add(a.getCoord().as_tuple())
-
+        # guardamos as posições iniciais possíveis para o main usar
+        ambient.agent_spawns = agent_spawns
         return ambient
+
+    @staticmethod
+    def demo_map():
+        """
+        Mapa de teste “hard-coded” mas agora dentro do Ambient (não no main).
+        """
+        width, height = 10, 8
+        lighthouse = LightHouse(Coord.Coord(8, 6))
+
+        obstacles = [
+            Obstacle(Coord.Coord(4, 1), "Wall"),
+            Obstacle(Coord.Coord(4, 2), "Wall"),
+            Obstacle(Coord.Coord(4, 3), "Wall"),
+            Obstacle(Coord.Coord(4, 4), "Wall"),
+            Obstacle(Coord.Coord(2, 6), "Fireplace"),
+        ]
+
+        return Ambient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])
+    
+
+
