@@ -9,7 +9,7 @@ import time
 from Conf import ConfigLightHouse as Conf
 
 
-class Simulator:
+class SimulatorLighthouse:
     def __init__(self):
         # # --------------------------
         # # Init do ambiente a partir do ficheiro de mapas
@@ -140,4 +140,4 @@ class Simulator:
 
 
 if __name__ == "__main__":
-    Simulator()
+    SimulatorLighthouse()

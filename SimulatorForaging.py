@@ -6,7 +6,7 @@ from ForagingAmbient import ForagingAmbient
 from ForagingAgent import ForagingAgent
 from ConfForaging import ConfigForaging as Conf
 
-class ForagingSimulator:
+class SimulatorForaging:
     def __init__(self):
         self.ambient = ForagingAmbient.from_txt(Conf.FILE_EPISODES_MAP)
 
@@ -111,4 +111,4 @@ class ForagingSimulator:
 
 
 if __name__ == "__main__":
-    ForagingSimulator()
+    SimulatorForaging()
