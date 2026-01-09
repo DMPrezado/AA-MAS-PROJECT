@@ -1,0 +1,107 @@
+Guia do Projeto - AA-MAS-PROJECT
+
+1. Introdução
+
+O presente documento descreve, de forma organizada e formal, a arquitetura e o funcionamento do projeto AA-MAS-PROJECT. Expõe os principais módulos e classes, o fluxo de execução das simulações (Farol / Foraging), os mecanismos de aprendizagem implementados (Q-learning) e as anomalias observadas durante o desenvolvimento e a execução. No final são apresentadas recomendações de melhoria.
+
+2. Estrutura (ficheiros relevantes)
+
+- `Coord.py`: representação de coordenadas no mapa.
+- `Entity.py`: superclasse base para objetos posicionáveis no ambiente.
+- `Ambient.py` / `ForagingAmbient.py`: implementação do ambiente (mapa), leitura de ficheiros de mapa, gestão de obstáculos, ocupação de
+posições e APIs de renderização (TUI / GUI).
+- `Agent.py` / `ForagingAgent.py`: agentes que interagem com o ambiente. Implementam sensores, política de decisão e métodos de movimento;
+atualizam o fitness e flags (por exemplo, `finished_flag`).
+- `LightHouse.py` / `Nest.py` / `Resource.py` / `Obstacle.py`: entidades específicas do ambiente (farol, ninho, recursos, obstáculos).
+- `qlearning.py`: implementação central de Q-learning (tabelas, política ε-greedy, atualizações e gestão de ε).
+- `Simulator.py` / `SimulatorForaging.py`: classes que encapsulam ciclos de treino e de teste para os dois cenários (farol e foraging).
+Controlam episódios, passos, renderização e recolha de métricas.
+- `FarolMain.py` / `ForagingMain.py` / `Main.py` / (Cenas/*): vários scripts exemplo / pontos de entrada para correr simulações.
+- `Conf.py` / `ConfForaging.py`: parâmetros de configuração (número de episódios, duração máxima de episódio, ficheiros de mapa, flags de
+renderização durante o treino, etc.).
+
+3. Conceito e fluxo de execução (visão geral)
+
+3.1. Inicialização do ambiente
+- O ambiente (`Ambient` ou `ForagingAmbient`) é construído a partir de um mapa (método `from_txt` ou `demo_map`).
+- O ambiente instancia um conjunto de obstáculos, o farol (no cenário Lighthouse) e regista posições livres.
+- O ambiente mantém coleções auxiliares: `agents`, `occupiedPositions`, `agent_spawns`, e fornece utilitários como `freePositions()`,
+`getObject(coord)`, `render()` (TUI) e `init_render_window()` / `render_window()` (GUI/Tkinter).
+
+3.2. Agentes e posições
+- Um agente (`Agent` / `ForagingAgent`) é criado com um nome, referência ao ambiente e uma posição inicial (`Coord`).
+- A criação do agente regista a sua posição em `ambient.occupiedPositions` e adiciona o agente à lista `ambient.agents`.
+- Cada agente possui atributos como `coord`, `fitness`, `finished_flag`, `whereIsFront` (orientação) e sinais específicos (por exemplo,
+`has_resource` no `ForagingAgent`).
+- Movimentação: os agentes decidem movimentos através de funções como `movementChoice()` que, em implementações com aprendizagem,
+recorrem a `qlearning.choose_action()`; em modos fixos ou aleatórios escolhem uma ação candidata aleatoriamente.
+
+3.3. Episódios, treino e teste
+- Os simuladores (`Simulator`, `ForagingSimulator`) controlam ciclos de treino (múltiplos episódios) e de teste.
+- Em cada episódio, o agente é colocado numa posição inicial (aleatória, via `reset_agent_random` ou `reset_episode`) e o estado
+interno do agente é reiniciado (fitness, flags, etc.).
+- O ciclo por passos executa: chamada a `agent.executar()` (que avalia sensores, escolhe ação e executa o movimento), renderização
+opcional (GUI/TUI) e verificação de condições de paragem (por exemplo, `finished_flag` ou limite de passos).
+- Durante o treino a política explora (ε elevado) e, no final de cada episódio, é invocada `qlearning.decay_epsilon()` para reduzir
+a componente de exploração; durante o teste, normalmente define-se `qlearning.EPSILON = 0.0` para avaliação da política gananciosa.
+
+3.4. Q-learning (módulo `qlearning.py`)
+- A implementação mantém Q-tables separadas por tarefa: `Q_TABLES = {"lighthouse": {}, "foraging": {}}` para evitar a contaminação
+de políticas entre tarefas distintas.
+- Ações: para Lighthouse existe o dicionário `ACTIONS` (0: cima, 1: baixo, 2: esquerda, 3: direita). No Foraging existem ações
+adicionais (PICK / DROP) definidas em `ForagingAgent`.
+- Política de decisão: `choose_action(state, actions, banned_actions, task)` implementa uma política ε-greedy. Se `actions` for None
+utiliza `ACTIONS.keys()` (modo Lighthouse). Se `random < EPSILON` procede à exploração; em caso contrário escolhe a melhor ação com base nos valores Q.
+- Atualização: `update_Q(state, action, reward, next_state, actions, task)` aplica a atualização Q(s,a) ← Q(s,a) + α [r + γ max_a' Q(s',a') − Q(s,a)].
+- Hiperparâmetros: ALPHA, GAMMA, EPSILON, EPSILON_DECAY, EPSILON_MIN. Existem funções utilitárias como `decay_epsilon()` e `reset_task(task)`.
+
+4. Representação do estado e ações
+- O projeto tende a usar estados concisos (tipicamente `Coord` ou uma representação derivada) e ações indexadas (inteiros mapeados
+para deslocamentos).
+- No Foraging, o estado inclui informação adicional (se o agente transporta um recurso, orientação, passos desde o pickup, etc.).
+
+5. Interface de utilizador e visualização
+- Existe uma TUI (terminal) através de `ambient.render()` que imprime o mapa e a posição dos objetos.
+- Existe uma GUI básica implementada com Tkinter integrada no `Ambient` (`init_render_window`, `render_window`) que mostra o mapa
+e atualiza a cada passo quando solicitada.
+- Os simuladores (`Simulator*`) recorrem à GUI na fase de teste para visualizar as políticas (quando `init_render_window()` é
+chamada e `render_each_step=True`).
+
+6. Casos de erro e observações registadas (com base nos erros reportados durante o desenvolvimento)
+- `Coord` não é hashable: a utilização de `ambient.occupiedPositions.add(self.coord)` resultou em `TypeError: unhashable type:
+'Coord'`. A causa provável é que a classe `Coord` não implementa `__hash__`/`__eq__` ou que o código espera trabalhar com tuplas
+(`coord.as_tuple()`). Em várias partes do projeto utiliza-se `coord.as_tuple()` para indexar coleções como `occupiedPositions`.
+
+- `TypeError: 'module' object is not callable`: ocorre quando há colisão entre nomes de ficheiros e nomes de classes (por exemplo,
+usar `import Obstacle` em vez de `from Obstacle import Obstacle`), ou quando o módulo não exporta a classe com o nome esperado.
+Recomenda-se rever as instruções de importação e garantir `from X import Y` quando apropriado.
+
+- `TypeError` ao herdar de uma classe: a mensagem "module() takes at most 2 arguments (3 given)" ao definir `class LightHouse(Entity)`
+indica que `Entity` foi importado como módulo e não como classe. Deve confirmar-se que se utiliza `from Entity import Entity` quando
+se pretende herdar dessa classe.
+
+- Erro na assinatura de métodos (ex.: `getLightHouseDistance`): a mensagem "takes 1 positional argument but 2 were given" aponta para
+discrepância entre a forma como o método foi definido (possivelmente sem o parâmetro `self`) e a forma como é invocado. Recomenda-se
+rever as definições de métodos de instância.
+
+- Sobreposição de agentes: por opção de desenho do projeto, permite-se que dois agentes ocupem a mesma célula. No entanto, a
+infraestrutura mantém `occupiedPositions`, pelo que existe alguma inconsciência entre permitir sobreposição e manter esse conjunto;
+é recomendável clarificar a semântica e alinhar as estruturas de dados com o comportamento desejado.
+
+7. Boas práticas observadas e pressupostos
+- As Q-tables estão segregadas por tarefa — boa prática para evitar a poluição de políticas entre domínios distintos.
+- A separação entre `ambient` e `agent` é bem definida: o agente consulta o ambiente (sensores) e solicita movimentos; o ambiente
+controla colisões/ocupação e a renderização.
+- O código integra TUI e GUI; os simuladores decidem quando usar cada interface.
+
+8. Conclusão
+
+O projeto tem uma arquitetura típica para simuladores multiagente com aprendizagem: ambiente separado dos agentes, simuladores que
+controlam treino e teste e um módulo Q-learning simples. As prioridades para aumentar a robustez são: normalizar importações, garantir
+que `Coord` é hashable ou padronizar o uso de tuplas, corrigir assinaturas de métodos e separar a interface gráfica da lógica, de modo
+a permitir execuções sem interface e facilitar testes.
+
+Caso pretenda, posso:
+- Gerar um checklist de alterações e criar um branch com refactors (importações, hashing de `Coord`, correção de assinaturas);
+- Criar o ficheiro `Main_clean.py` que executa uma simulação simples sem alterar as classes existentes;
+- Implementar testes unitários básicos (para `Coord`, `Ambient.freePositions`, `qlearning.choose_action` / `update_Q`).
