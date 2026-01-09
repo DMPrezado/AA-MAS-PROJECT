@@ -130,7 +130,7 @@ class Simulator:
         import matplotlib.pyplot as plt
 
         plt.plot(self.FITNESS_HISTORY)
-        plt.title("Farol: Fitness ao longo dos episódios de treino")
+        plt.title("Lighthouse: Fitness ao longo dos episódios de treino")
         plt.xlabel("Episódio")
         plt.ylabel("Fitness")
         plt.grid()

@@ -7,7 +7,7 @@ class ConfigLightHouse:
     # ------------------------
     # "fixed"      -> política fixa (heurística)
     # "qlearning"  -> aprendizagem Q-learning
-    MODE = "qlearning"   # ALTERA AQUI ou via terminal (ver Simulator.py)
+    MODE = "qlearning"   # ALTERA AQUI ou via terminal (ver SimulatorLighthouse.py)
 
     MOVE_WITH_FIXED_POLICIES = (MODE == "fixed")
     MOVE_WITH_QLEARNING = (MODE == "qlearning")
