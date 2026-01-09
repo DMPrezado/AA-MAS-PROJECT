@@ -6,7 +6,7 @@ from Agent import Agent
 import qlearning
 import random
 import time
-from Conf import ConfigLightHouse as Conf
+from Conf import ConfigLighthouse as Conf
 
 
 class SimulatorLighthouse:

@@ -1,6 +1,6 @@
 # Conf.py
 
-class ConfigLightHouse:
+class ConfigLighthouse:
 
     # ------------------------
     # EXECUTION MODE

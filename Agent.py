@@ -29,7 +29,7 @@ from Entity import Entity
 from LightHouse import LightHouse
 from Obstacle import Obstacle
 from qlearning import ACTIONS, choose_action, update_Q
-from Conf import ConfigLightHouse as Conf
+from Conf import ConfigLighthouse as Conf
 
 
 
