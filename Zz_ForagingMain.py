@@ -1,5 +1,5 @@
 """
-ForagingMain.py
+Zz_ForagingMain.py
 Simulação simples para Foraging (smoke test):
 - cria um ForagingAmbient corretamente
 - cria 2 agentes em posições livres
