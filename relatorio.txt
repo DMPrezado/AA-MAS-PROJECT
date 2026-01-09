@@ -3,18 +3,25 @@ Data: 2026-01-07
 
 1. Sumário executivo
 
-O presente relatório descreve a análise técnica conduzida sobre o repositório "AA‑MAS‑PROJECT", relaciona os erros observados durante a execução e os testes, documenta as alterações efectuadas nos pontos de entrada (mains) para fins de validação e propõe um conjunto de melhorias priorizadas. O objectivo é fornecer uma visão clara, estruturada e accionável do estado actual do código, bem como orientar as intervenções necessárias para incrementar a robustez, a repetibilidade dos experimentos e a facilidade de manutenção.
+O presente relatório descreve a análise técnica conduzida sobre o repositório "AA‑MAS‑PROJECT", relaciona os erros observados durante a
+execução e os testes, documenta as alterações efetuadas nos pontos de entrada (mains) para fins de validação e propõe um conjunto de melhorias
+priorizadas. O objetivo é fornecer uma visão clara, estruturada e acionável do estado atual do código, bem como orientar as intervenções
+necessárias para incrementar a robustez, a repetibilidade dos experimentos e a facilidade de manutenção.
 
 2. Metodologia
 
-A análise incidiu sobre os ficheiros centrais do projecto relativos às duas tarefas implementadas (Lighthouse e Foraging): ficheiros de ambiente (Ambient.py, ForagingAmbient.py), agentes (Agent.py, ForagingAgent.py), simuladores (SimulatorForaging.py), módulo de Q‑learning (qlearning.py) e os pontos de entrada (vários mains). Foram executadas simulações de smoke‑test, observadas as mensagens de erro apresentadas no terminal e inspecionado o código para identificar causas prováveis. Alterações pontuais foram aplicadas apenas aos ficheiros de entrada (mains) com o propósito de facilitar testes e visualização, evitando alterações nos módulos de lógica dos agentes e do ambiente.
+A análise incidiu sobre os ficheiros centrais do projecto relativos às duas tarefas implementadas (Lighthouse e Foraging): ficheiros de ambiente
+(Ambient.py, ForagingAmbient.py), agentes (Agent.py, ForagingAgent.py), simuladores (SimulatorForaging.py), módulo de Q‑learning (qlearning.py)
+e os pontos de entrada (vários mains). Foram executadas simulações de smoke‑test, observadas as mensagens de erro apresentadas no terminal e
+inspecionado o código para identificar causas prováveis. Alterações pontuais foram aplicadas apenas aos ficheiros de entrada (mains) com o
+propósito de facilitar testes e visualização, evitando alterações nos módulos de lógica dos agentes e do ambiente.
 
 3. Inventário funcional condensado
 
 - Ambient.py: implementação do ambiente para Lighthouse com render textual e interface gráfica via Tkinter.
 - ForagingAmbient.py: ambiente para Foraging (recursos, ninho) com render textual e renderização gráfica.
 - Agent.py: agente para a tarefa Lighthouse com sensores, políticas (Q‑learning e políticas fixas) e cálculo de recompensa.
-- ForagingAgent.py: agente para Foraging com ações adicionais (PICK/DROP), políticas e actualização de Q.
+- ForagingAgent.py: agente para Foraging com ações adicionais (PICK/DROP), políticas e atualização de Q.
 - qlearning.py: implementação tabular de Q‑learning (ε‑greedy, update_Q, Q‑tables por tarefa).
 - SimulatorForaging.py: rotina de treino e teste para Foraging (execução por episódios, redução de epsilon, avaliação).
 - FarolMain.py, ForagingMain.py, Main_clean.py: pontos de entrada para simulações e testes.
@@ -25,73 +32,51 @@ A análise incidiu sobre os ficheiros centrais do projecto relativos às duas ta
 - Lighthouse
   - Políticas: Q‑learning tabular (ε‑greedy) ou políticas fixas (heurísticas baseadas em sensores).
   - Recompensas: definidas em configuração específica (shaping por aproximação/afastamento, penalizações, recompensa por alcançar o farol).
-  - Uso: mains de teste executam episódios curtos; não existe no repositório um simulador de treino equivalente ao foraging (mas a estrutura de agente suporta Q‑learning).
+  - Uso: mains de teste executam episódios curtos; não existe no repositório um simulador de treino equivalente ao foraging (mas a estrutura
+  de agente suporta Q‑learning).
 
 - Foraging
-  - Políticas: ForagingAgent suporta Q‑learning (tabular, com ações de movimento e PICK/DROP) e uma política fixa heurística (greedy por Manhattan), seleccionável por `ConfForaging.MODE`.
-  - Recompensas: definida em `ConfForaging.py` (recompensas por pick/drop, penalizações por movimentos inválidos, shaping por aproximação ao alvo, custo base por passo).
-  - Fluxo de treino: `SimulatorForaging.py` implementa treino por múltiplos episódios, com reinicialização do mapa por episódio, acumulação de histórico de fitness e redução de EPSILON; em seguida testa em modo greedy (EPSILON=0).
+  - Políticas: ForagingAgent suporta Q‑learning (tabular, com ações de movimento e PICK/DROP) e uma política fixa heurística (greedy por Manhattan).
+  - Recompensas: definida em `ConfForaging.py` (recompensas por pick/drop, penalizações por movimentos inválidos, shaping por aproximação ao alvo,
+  custo base por passo).
+  - Treino: `SimulatorForaging.py` implementa treino por múltiplos episódios, com reinicialização do mapa por episódio, acumulação de
+  histórico de fitness e redução de EPSILON; em seguida testa em modo greedy (EPSILON=0).
 
-5. Erros detectados: descrição, causa provável e recomendações
+5. Erros detetados: descrição, causa provável e recomendações
 
 5.1 "TypeError: unhashable type: 'Coord'"
 - Descrição: operação de inserção de coordenada num `set` provocou TypeError.
 - Causa provável: a classe `Coord` não implementa métodos `__hash__` e `__eq__` coerentes; instâncias não são hashable.
-- Recomendação: adoptar uma política consistente de representação de coordenadas. Duas opções: (a) armazenar sempre tuplos imutáveis `(x,y)` nas estruturas de conjunto; (b) implementar `__eq__` e `__hash__` em `Coord` e garantir que objetos `Coord` são tratados como imutáveis. A opção (a) é a mais simples e evita efeitos colaterais.
+- Recomendação: adotar uma política consistente de representação de coordenadas. Duas opções: (a) armazenar sempre tuplos imutáveis
+`(x,y)` nas estruturas de conjunto; (b) implementar `__eq__` e `__hash__` em `Coord` e garantir que objetos `Coord` são tratados como imutáveis.
+A opção (a) é a mais simples e evita efeitos colaterais.
 
 5.2 "TypeError: 'module' object is not callable"
 - Descrição: tentativa de instanciar uma entidade falha porque o nome referenciado é um módulo e não a classe.
-- Causa provável: imports incorrectos (por exemplo `import Obstacle` em vez de `from Obstacle import Obstacle`) ou shadowing de nomes entre módulos e classes.
-- Recomendação: normalizar imports em todo o projecto (usar `from X import Y` quando se pretende a classe `Y`) e evitar nomear módulos/variáveis com o mesmo identificador das classes.
+- Causa provável: imports incorretos (p.e. `import Obstacle` em vez de `from Obstacle import Obstacle`) ou shadowing de nomes entre módulos e classes.
+- Recomendação: normalizar imports em todo o projeto (usar `from X import Y` quando se pretende a classe `Y`) e evitar nomear módulos/variáveis
+com o mesmo identificador das classes.
 
 5.3 Erros de assinatura / nomes inconsistentes (ex.: getLightHouseDistance vs distance_to_lighthouse)
 - Descrição: chamadas de métodos com nomes ou assinaturas diferentes entre call sites e implementações.
 - Causa provável: refactorings incompletos ou nomes antigos deixados em vários ficheiros.
-- Recomendação: definir um contrato de API (naming) para os agentes e aplicar uma revisão que uniformize os nomes públicos (documentar no topo dos ficheiros) e actualizar os call sites.
 
-6. Alterações efectuadas e justificativa
+6. Resultados dos testes efetuados
 
-Foram aplicadas alterações limitadas e controladas aos mains com dois objectivos: (i) permitir testes rápidos de integração com a interface gráfica já implementada; (ii) apresentar, no final da simulação, o valor de fitness de cada agente.
-
-Listagem resumida das alterações efectuadas:
-- `Main_clean.py`: criado/actualizado para imprimir o fitness final dos agentes ao terminar a simulação.
-- `ForagingMain.py`: criado (várias versões testadas) como um smoke test para Foraging. A versão final imprime TUI por passo e actualiza a GUI; as acções dos agentes podem ser seleccionadas aleatoriamente (utilizando `apply_action`) para aplicar recompensas e actualizações de Q se existirem condições de treino activas.
-- `FarolMain.py` (anteriormente referido noutras iterações como `NewMain.py`): actualizado para inicializar a janela Tkinter e actualizar o canvas durante a simulação; mantém a TUI. Foi adicionada detecção de fecho da janela para terminar a simulação de forma limpa.
-
-Justificação: estas alterações são de baixo risco e destinam‑se a facilitar a inspeção manual do funcionamento dos agentes e do ambiente sem modificar a lógica central de aprendizagem ou a organização de recompensas.
-
-7. Resultados dos testes efectuados
-
-- Execução de `ForagingMain.py` em ambiente local (Windows PowerShell): a simulação correu com actualização gráfica e imprime o grid no terminal a cada passo. Uma execução exemplar terminou por limite de passos; foram mostrados os valores de fitness finais dos agentes (valores dependem da sequência aleatória de ações e da configuração de recompensas).
+- Execução de `ForagingMain.py` em ambiente local (Windows PowerShell): a simulação correu com atualização gráfica e imprime o grid no
+terminal a cada passo. Uma execução exemplar terminou por limite de passos; foram mostrados os valores de fitness finais dos agentes
+(valores dependem da sequência aleatória de ações e da configuração de recompensas).
 - Validação de sintaxe: os ficheiros modificados não apresentam erros de sintaxe segundo as ferramentas de verificação utilizadas.
 
-8. Recomendações de melhoria e priorização
+7. Possiveis melhorias
 
-Prioridade imediata
-1. Normalizar imports: rever todos os ficheiros e garantir que `from Modulename import Classname` é usado quando se pretende referir à classe; eliminar shadowing.
-2. Resolver a representatividade das coordenadas: optar por tuplos imutáveis `(x,y)` ou implementar `__hash__`/`__eq__` em `Coord`; actualizar todas as operações sobre `occupiedPositions` para usar a forma escolhida.
-3. Uniformizar nomes públicos de métodos: documentar e aplicar convenção (ex.: `distance_to_lighthouse`, `apply_action`, `get_state`, `executar`), e actualizar call sites correspondentes.
+- 1. Escolher e aplicar política para representação de coordenadas (implementar rapidamente em Coord.py ou converter todos os inserts/reads para `as_tuple()`).
+- 2. Rever imports e corrigir os casos detetados que causaram erros de import/instância.
+- 3. Acrescentar testes unitários mínimos e configurar um pipeline CI simples que corra lint e os testes básicos.
 
-Prioridade média
-4. Encapsular configuração de treino (EPSILON, ALPHA, GAMMA) e evitar variáveis globais mutáveis dispersas. Considerar um objecto de sessão de treino que transporte hiperparâmetros.
-5. Persistir Q‑tables (serialize/deserialize) para evitar treinos repetidos e permitir avaliação reprodutível.
-6. Adicionar testes unitários simples para funções críticas (Coord, Ambient.freePositions, ForagingAmbient.from_txt, comportamento básico de moveTo / apply_action).
+8. Conclusão
 
-Prioridade baixa
-7. Melhorar a interface gráfica com indicadores textuais (passo corrente, recursos restantes, fitness por agente) e controlos de pausa/velocidade.
-8. Adicionar interface CLI para controlar modo de execução (render/no-render, quiet, map file, seed, N agents).
-9. Documentação do processo de treino e reprodução de experiências (README com exemplos de execução e instruções para treino com `SimulatorForaging.py`).
-
-9. Plano de acção recomendado (curto prazo)
-
-1. Escolher e aplicar política para representação de coordenadas (implementar rapidamente em Coord.py ou converter todos os inserts/reads para `as_tuple()`).
-2. Rever imports e corrigir os casos detectados que causaram erros de import/instância.
-3. Acrescentar testes unitários mínimos e configurar um pipeline CI simples que corra lint e os testes básicos.
-
-10. Conclusão
-
-O código apresenta uma base sólida para experimentação com agentes (Lighthouse e Foraging), incluindo componentes gráficos e um simulador de treino para Foraging. As principais fragilidades detectadas são de natureza estrutural (imports, representação de coordenadas, inconsistências de naming) e recomendam‑se intervenções de baixo risco que aumentarão imediatamente a robustez e a repetibilidade dos ensaios. Recomenda‑se iniciar pelas correções de prioridade imediata antes de evoluir para a persistência de Q‑tables, melhoria da GUI e integração de testes automatizados.
-
----
-Este documento pode ser alterado para incluir patches propostos (diffs) ou para adaptar o nível técnico à audiência pretendida. Caso deseje, posso: (a) aplicar directamente a correção para a representação de coordenadas; (b) adicionar testes unitários exemplo; (c) gerar um README com instruções de treino e teste.
-
+O código apresenta uma base sólida para experimentação com agentes (Lighthouse e Foraging), incluindo componentes gráficos e um
+simulador de treino para Foraging. As principais fragilidades detetadas são de natureza estrutural (imports, representação de
+coordenadas, inconsistências de naming) e recomendam‑se intervenções de baixo risco que aumentarão imediatamente a robustez e a
+repetibilidade dos ensaios.
