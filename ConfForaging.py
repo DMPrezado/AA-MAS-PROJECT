@@ -14,9 +14,10 @@ class ConfigForaging:
     # ------------------------
     # TRAINING
     # ------------------------
-    NUMBER_EPISODES = 600
-    MAX_STEPS_PER_EPISODE = 120
+    NUMBER_EPISODES = 1000
+    MAX_STEPS_PER_EPISODE = 300
     RENDER_DURING_TRAINING = False
+    NUMBER_RESOURCES = 4
 
     # ------------------------
     # STEP SENSOR

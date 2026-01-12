@@ -1,3 +1,4 @@
+import math
 import random
 import Coord
 from Entity import Entity
@@ -57,19 +58,27 @@ class ForagingAgent(Entity):
         return (n.x - self.coord.x, n.y - self.coord.y)
 
     def sensorNearestResourceVector(self):
-        """(dx,dy) para o recurso mais próximo (Manhattan). Se não houver, (0,0)."""
+        """(dx, dy) para o recurso mais próximo (Manhattan). Se não houver, (0, 0)."""
         if not self.ambient.resources:
             return (0, 0)
-        ax, ay = self.coord.x, self.coord.y
-        best_dx, best_dy = 0, 0
-        best_d = 10**9
-        for r in self.ambient.resources:
-            rx, ry = r.getCoord().x, r.getCoord().y
-            d = abs(rx - ax) + abs(ry - ay)
-            if d < best_d:
-                best_d = d
-                best_dx, best_dy = (rx - ax), (ry - ay)
-        return (best_dx, best_dy)
+
+        agent_x, agent_y = self.coord.x, self.coord.y
+        closest_dx, closest_dy = 0, 0
+        min_distance = float("inf")
+
+        for resource in self.ambient.resources:
+            resource_x = resource.getCoord().x
+            resource_y = resource.getCoord().y
+
+            distance = abs(resource_x - agent_x) + abs(resource_y - agent_y)
+
+            if distance < min_distance:
+                min_distance = distance
+                closest_dx = resource_x - agent_x
+                closest_dy = resource_y - agent_y
+
+        return (closest_dx, closest_dy)
+
 
     def _coord_after_move(self, action):
         dx, dy = FORAGING_ACTIONS[action]
@@ -214,6 +223,7 @@ class ForagingAgent(Entity):
                 self.has_resource = False
                 self.steps_carrying = 0
                 reward += Conf.REWARD_DROP_IN_NEST
+                self.ambient.picked_resources += 1
             else:
                 reward += Conf.REWARD_INVALID_DROP
 
@@ -243,100 +253,199 @@ class ForagingAgent(Entity):
     # FIXED POLICY (opcional)
     # --------------------------
 
-    def fixedPolicyChoice(self):
-        """
-        Política fixa:
-        1) Se estiver em cima de recurso e não tiver -> PICK
-        2) Se estiver no ninho e tiver -> DROP
-        3) Caso contrário:
-            - se não tiver recurso: vai para o recurso mais próximo (greedy por Manhattan)
-            - se tiver recurso: vai para o ninho
-            - evita Wall/Limit/Fireplace
-        """
+    # def fixedPolicyChoice(self):
+    #     """
+    #     Política fixa:
+    #     1) Se estiver em cima de recurso e não tiver -> PICK
+    #     2) Se estiver no ninho e tiver -> DROP
+    #     3) Caso contrário:
+    #         - se não tiver recurso: vai para o recurso mais próximo (greedy por Manhattan)
+    #         - se tiver recurso: vai para o ninho
+    #         - evita Wall/Limit/Fireplace
+    #     """
 
-        # 1) PICK se estou em cima do recurso
-        if (not self.has_resource) and self.ambient.has_resource_at(self.coord):
+    #     # 1) PICK se estou em cima do recurso
+    #     if (not self.has_resource) and self.ambient.has_resource_at(self.coord):
+    #         return PICK_ACTION
+
+    #     # 2) DROP se estou no ninho
+    #     here = self.ambient.getObject(self.coord)
+    #     if self.has_resource and isinstance(here, Nest):
+    #         return DROP_ACTION
+
+    #     # 3) Escolher alvo
+    #     if self.has_resource:
+    #         tx, ty = self.ambient.getNest().getCoord().x, self.ambient.getNest().getCoord().y
+    #     else:
+    #         # recurso mais próximo
+    #         if not self.ambient.resources:
+    #             # se já não há recursos, vagueia
+    #             return random.choice([0, 1, 2, 3])
+
+    #         ax, ay = self.coord.x, self.coord.y
+    #         best = None
+    #         best_d = 10**9
+    #         for r in self.ambient.resources:
+    #             rx, ry = r.getCoord().x, r.getCoord().y
+    #             d = abs(rx - ax) + abs(ry - ay)
+    #             if d < best_d:
+    #                 best_d = d
+    #                 best = (rx, ry)
+
+    #         tx, ty = best
+
+    #     # direções possíveis (ação -> (dx,dy))
+    #     directions = {
+    #         0: (0, -1),  # up
+    #         1: (0,  1),  # down
+    #         2: (-1, 0),  # left
+    #         3: (1,  0),  # right
+    #     }
+
+    #     def is_blocked(coord):
+    #         obj = self.ambient.getObject(coord)
+    #         if obj is None:
+    #             return False
+    #         if getattr(obj, "type", None) == "Limit":
+    #             return True
+    #         if isinstance(obj, Obstacle):
+    #             # evita paredes e fogueiras
+    #             t = obj.getType()
+    #             return t in ("Wall", "Fireplace", "Limit")
+    #         return False
+
+    #         # 4) Greedy: escolhe o move que minimiza distância Manhattan ao alvo
+    #     best_actions = []
+    #     best_dist = 10**9
+
+    #     for a, (dx, dy) in directions.items():
+    #         nc = Coord.Coord(self.coord.x + dx, self.coord.y + dy)
+
+    #         if is_blocked(nc):
+    #             continue
+
+    #         d = abs(tx - nc.x) + abs(ty - nc.y)
+    #         if d < best_dist:
+    #             best_dist = d
+    #             best_actions = [a]
+    #         elif d == best_dist:
+    #             best_actions.append(a)
+
+    #     # Se há boas escolhas, escolhe uma (com algum random para fugir a empates)
+    #     if best_actions:
+    #         return random.choice(best_actions)
+
+    #     # 5) fallback: se tudo está bloqueado, tenta qualquer direção não bloqueada
+    #     fallback = [a for a,(dx,dy) in directions.items()
+    #                 if not is_blocked(Coord.Coord(self.coord.x + dx, self.coord.y + dy))]
+    #     if fallback:
+    #         return random.choice(fallback)
+
+    #     # 6) se estiver encurralado total, não mexe (mas como só temos 0..5, devolve um move)
+    #     return random.choice([0, 1, 2, 3])
+
+
+
+
+    def fixedPolicyChoice(self):
+        front = self.whereIsFront
+        back  = (-front[0], -front[1])
+        left  = (-front[1], front[0])
+        right = (front[1], -front[0])
+
+        def sensorDirection(tuple_coord):
+            goal_x, goal_y = tuple_coord[0], tuple_coord[1]
+            ax ,ay = self.coord.x, self.coord.y
+
+            angle = math.degrees(math.atan2(goal_x - ay, goal_y - ax)) + 90
+            angle = (angle + 180) % 360 - 180
+            return angle
+
+        def step(direction):
+            dx, dy = direction
+            return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
+
+        def is_free(c):
+            obj = self.ambient.getObject(c)
+            return (obj is None) or isinstance(obj, Resource) or isinstance(obj, Nest)
+
+        def searchResouce():
+            resourceCoord_asTuple = self.sensorNearestResourceVector()
+            angle = sensorDirection(resourceCoord_asTuple)
+            
+            if random.random() < 0.45:
+                directions = [front, left, right, back]
+                random.shuffle(directions)
+                for d in directions:
+                    c = step(d)
+                    if is_free(c):
+                        return c
+
+    
+        # 3) Caso contrário, usa o ângulo
+            if -45 <= angle <= 45:
+                preferred = [front, left, right, back]
+            elif 45 < angle <= 135:
+                preferred = [left, front, back, right]
+            elif -135 <= angle < -45:
+                preferred = [right, front, back, left]
+            else:
+                preferred = [back, left, right, front]
+
+            for d in preferred:
+                c = step(d)
+                if is_free(c):
+                    return c
+
+
+        carrying = self.has_resource
+
+        if not carrying:
+            self.
+        # PICK
+        if not carrying and on_resource:
             return PICK_ACTION
 
-        # 2) DROP se estou no ninho
-        here = self.ambient.getObject(self.coord)
-        if self.has_resource and isinstance(here, Nest):
+        # DROP
+        if carrying and on_nest:
             return DROP_ACTION
 
-        # 3) Escolher alvo
-        if self.has_resource:
-            tx, ty = self.ambient.getNest().getCoord().x, self.ambient.getNest().getCoord().y
+        # vetor alvo
+        if carrying:
+            dx, dy = nest_dx, nest_dy
         else:
-            # recurso mais próximo
-            if not self.ambient.resources:
-                # se já não há recursos, vagueia
-                return random.choice([0, 1, 2, 3])
+            dx, dy = resource_dx, resource_dy
 
-            ax, ay = self.coord.x, self.coord.y
-            best = None
-            best_d = 10**9
-            for r in self.ambient.resources:
-                rx, ry = r.getCoord().x, r.getCoord().y
-                d = abs(rx - ax) + abs(ry - ay)
-                if d < best_d:
-                    best_d = d
-                    best = (rx, ry)
+        possible_actions = []
 
-            tx, ty = best
+        if dy == -1 and not blocked_up:
+            possible_actions.append(0)   # up
+        if dy == 1 and not blocked_down:
+            possible_actions.append(1)   # down
+        if dx == -1 and not blocked_left:
+            possible_actions.append(2)   # left
+        if dx == 1 and not blocked_right:
+            possible_actions.append(3)   # right
 
-        # direções possíveis (ação -> (dx,dy))
-        directions = {
-            0: (0, -1),  # up
-            1: (0,  1),  # down
-            2: (-1, 0),  # left
-            3: (1,  0),  # right
-        }
+        # fallback: qualquer direção livre
+        if not possible_actions:
+            if not blocked_up: possible_actions.append(0)
+            if not blocked_down: possible_actions.append(1)
+            if not blocked_left: possible_actions.append(2)
+            if not blocked_right: possible_actions.append(3)
 
-        def is_blocked(coord):
-            obj = self.ambient.getObject(coord)
-            if obj is None:
-                return False
-            if getattr(obj, "type", None) == "Limit":
-                return True
-            if isinstance(obj, Obstacle):
-                # evita paredes e fogueiras
-                t = obj.getType()
-                return t in ("Wall", "Fireplace", "Limit")
-            return False
+        if not possible_actions:
+            return random.choice([0, 1, 2, 3])
 
-            # 4) Greedy: escolhe o move que minimiza distância Manhattan ao alvo
-        best_actions = []
-        best_dist = 10**9
+        return random.choice(possible_actions)
 
-        for a, (dx, dy) in directions.items():
-            nc = Coord.Coord(self.coord.x + dx, self.coord.y + dy)
-
-            if is_blocked(nc):
-                continue
-
-            d = abs(tx - nc.x) + abs(ty - nc.y)
-            if d < best_dist:
-                best_dist = d
-                best_actions = [a]
-            elif d == best_dist:
-                best_actions.append(a)
-
-        # Se há boas escolhas, escolhe uma (com algum random para fugir a empates)
-        if best_actions:
-            return random.choice(best_actions)
-
-        # 5) fallback: se tudo está bloqueado, tenta qualquer direção não bloqueada
-        fallback = [a for a,(dx,dy) in directions.items()
-                    if not is_blocked(Coord.Coord(self.coord.x + dx, self.coord.y + dy))]
-        if fallback:
-            return random.choice(fallback)
-
-        # 6) se estiver encurralado total, não mexe (mas como só temos 0..5, devolve um move)
-        return random.choice([0, 1, 2, 3])
     
 
 
     def executar(self):
+        if Conf.NUMBER_RESOURCES == self.ambient.picked_resources:
+            self.finished_flag = True
+            return
         if Conf.MOVE_WITH_QLEARNING:
             action = self.movementChoice()
         elif Conf.MOVE_WITH_FIXED_POLICIES:

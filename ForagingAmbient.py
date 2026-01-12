@@ -10,6 +10,7 @@ class ForagingAmbient:
         self.nest = nest
         self.obstacles = obstacles if obstacles is not None else []
         self.resources = resources if resources is not None else []
+        self.picked_resources = 0
         self.agents = agents if agents is not None else []
 
         self.occupiedPositions = set()
@@ -129,8 +130,8 @@ class ForagingAmbient:
                     obstacles.append(Obstacle(coord, "Wall"))
                 elif ch == "F":
                     obstacles.append(Obstacle(coord, "Fireplace"))
-                elif ch == "R":
-                    resources.append(Resource(coord))
+                # elif ch == "R":
+                #     resources.append(Resource(coord))
                 elif ch == "N":
                     nest = Nest(coord)
                 elif ch == "A":
@@ -143,6 +144,7 @@ class ForagingAmbient:
             agents=[]
         )
         ambient.agent_spawns = agent_spawns
+
         return ambient
 
     # -------------------- RENDER WINDOW --------------------

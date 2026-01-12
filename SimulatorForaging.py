@@ -1,6 +1,7 @@
 # ForagingSimulator.py
 import random
 import time
+from Resource import Resource
 import qlearning
 from ForagingAmbient import ForagingAmbient
 from ForagingAgent import ForagingAgent
@@ -51,7 +52,8 @@ class ForagingSimulator:
                 self.ambient.root.update_idletasks()
                 self.ambient.root.update()
                 time.sleep(delay)
-
+            if self.agent.finished_flag:
+                break
         return self.agent.fitness
 
     def treinar(self):
@@ -62,13 +64,15 @@ class ForagingSimulator:
             self.ambient.agents = []
             start = random.choice(self.ambient.freePositions())
             self.agent = ForagingAgent("F0", self.ambient, start)
-
+            for _ in range(Conf.NUMBER_RESOURCES):
+                randPosition = random.choice(self.ambient.freePositions())
+                self.ambient.resources.append(Resource(randPosition))
             fit = self.run_episode(
                 max_steps=Conf.MAX_STEPS_PER_EPISODE,
                 render=Conf.RENDER_DURING_TRAINING
             )
 
-            #gaurda fitness
+            #guarda fitness
             self.FITNESS_HISTORY.append(fit)
 
             qlearning.decay_epsilon()
@@ -89,6 +93,9 @@ class ForagingSimulator:
             self.ambient.agents = []
             start = random.choice(self.ambient.freePositions())
             self.agent = ForagingAgent("F0", self.ambient, start)
+            for _ in range(Conf.NUMBER_RESOURCES):
+                randPosition = random.choice(self.ambient.freePositions())
+                self.ambient.resources.append(Resource(randPosition))
 
             self.ambient.init_render_window()
             print(f"\n--- TESTE {i+1}/{N_TEST} ---")
