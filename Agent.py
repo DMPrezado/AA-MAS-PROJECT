@@ -252,7 +252,7 @@ class Agent(Entity):
             obj = self.ambient.getObject(c)
             return (obj is None) or isinstance(obj, LightHouse)
 
-    # 1) Se o farol estiver visível, ir direto
+    # 1) Se houver farol visível, ir na sua direção
         if f_type == "LightHouse" and f_dist > 0:
             c = step(front)
             return c if is_free(c) else self.coord
@@ -269,7 +269,19 @@ class Agent(Entity):
             c = step(back)
             return c if is_free(c) else self.coord
 
-    # 2) Caso contrário, usa o ângulo
+    # 2) Movimento aleatório (exploração)
+        if random.random() < 0.45:
+            directions = [front, left, right, back]
+            random.shuffle(directions)
+            for d in directions:
+                c = step(d)
+                if is_free(c):
+                    return c
+
+        
+
+
+    # 3) Caso contrário, usa o ângulo
         if -45 <= angle <= 45:
             preferred = [front, left, right, back]
         elif 45 < angle <= 135:
@@ -284,7 +296,7 @@ class Agent(Entity):
             if is_free(c):
                 return c
 
-    # 3) Fica parado se não houver alternativa
+    # 4) Fica parado se não houver alternativa
         return self.coord
 
             
