@@ -28,12 +28,7 @@ class ForagingAmbient:
             self.occupiedPositions.add(a.getCoord().as_tuple())
 
     def _coord_to_tuple(self, coord):
-        if isinstance(coord, Coord.Coord):
-            return coord.getX(), coord.getY()
-        elif isinstance(coord, tuple):
-            return coord
-        else:
-            raise TypeError("coord deve ser Coord ou (x,y)")
+        return Coord.coord_to_tuple(coord)
 
     def getNest(self):
         return self.nest
@@ -116,9 +111,9 @@ class ForagingAmbient:
             raise ValueError("O ficheiro do mapa está vazio.")
         height = len(raw_lines)
         width = len(raw_lines[0])
-        for line in raw_lines:
-            if len(line) != width:
-                raise ValueError("Mapa não retangular.")
+        #for line in raw_lines:
+        #    if len(line) != width:
+        #        raise ValueError("Mapa não retangular.")
         obstacles = []
         resources = []
         nest = None

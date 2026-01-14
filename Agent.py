@@ -1,4 +1,3 @@
-
 # Class Agent
 # __init__(name: String, freePositions: List of Coord) -> Void
 # Attributes:
@@ -29,8 +28,7 @@ from Entity import Entity
 from LightHouse import LightHouse
 from Obstacle import Obstacle
 from qlearning import ACTIONS, choose_action, update_Q
-from Conf import ConfigLightHouse as Conf
-
+from ConfLighthouse import ConfigLightHouse as Conf
 
 
 class Agent(Entity):
@@ -54,14 +52,16 @@ class Agent(Entity):
 
 
     def getObject(self, coord):
+        # accept Coord or tuple
+        tx, ty = Coord.coord_to_tuple(coord)
         for o in self.ambient.obstacles:
-            if o.getCoord().as_tuple() == coord.as_tuple():
+            if o.getCoord().as_tuple() == (tx, ty):
                 return o
         for a in self.ambient.agents:
-            if a.getCoord().as_tuple() == coord.as_tuple():
+            if a.getCoord().as_tuple() == (tx, ty):
                 return a
         for lh in [self.ambient.lighthouse]:
-            if lh.getCoord().as_tuple() == coord.as_tuple():
+            if lh is not None and lh.getCoord().as_tuple() == (tx, ty):
                 return lh
         return None
 
@@ -208,7 +208,7 @@ class Agent(Entity):
 
         self.fitness += reward
 
-        if self.last_state is not None and self.last_action is not None:
+        if Conf.MOVE_WITH_QLEARNING and self.last_state is not None and self.last_action is not None:
             next_state = self.get_state()
             update_Q(self.last_state, self.last_action, reward, next_state)
 
@@ -224,7 +224,7 @@ class Agent(Entity):
 
         else:
             raise ValueError(
-            "Config inválida: escolhe 'fixed' ou 'qlearning' no Conf.py"
+            "Config inválida: escolhe 'fixed' ou 'qlearning' no ConfLighthouse.py"
         )
 
         self.moveTo(moveCoord)
@@ -300,5 +300,6 @@ class Agent(Entity):
         return self.coord
 
             
+
 
 

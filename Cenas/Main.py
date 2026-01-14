@@ -4,7 +4,7 @@ import random
 import time
 import qlearning
 
-from Ambient import Ambient
+from LighthouseAmbient import Ambient
 from Agent import Agent
 
 """

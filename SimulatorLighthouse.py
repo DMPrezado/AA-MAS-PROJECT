@@ -1,12 +1,12 @@
 from Coord import Coord
 from LightHouse import LightHouse
-from Ambient import Ambient
+from LighthouseAmbient import Ambient
 from Obstacle import Obstacle
 from Agent import Agent
 import qlearning
 import random
 import time
-from Conf import ConfigLightHouse as Conf
+from ConfLighthouse import ConfigLightHouse as Conf
 
 
 class Simulator:
@@ -24,17 +24,19 @@ class Simulator:
 
 
         # --------------------------
-        # 1) TREINO
+        # Treino / Teste / Plot
         # --------------------------
-        self.treinar()
-        # --------------------------
-        # 2) TESTE (muitos testes + render a cada passo)
-        # --------------------------
+        # Só treina se estiver em Q-learning
+        if Conf.MOVE_WITH_QLEARNING:
+            self.treinar()
+        else:
+            print("=== FIXED POLICY: sem treino ===")
+            qlearning.EPSILON = 0.0
+
+        # Teste (muitos testes + render a cada passo)
         self.testar()
-        # --------------------------
-        # 3) Plot dos resultados da aprendizagem e dos testes.
-        # --------------------------
-        #TODO: implementar plotagem dos resultados
+        # Plot dos resultados da aprendizagem e dos testes.
+        # TODO: implementar plotagem dos resultados
         self.plot_results()
         
         
