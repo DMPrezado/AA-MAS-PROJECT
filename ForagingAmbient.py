@@ -5,13 +5,13 @@ from Nest import Nest
 from Resource import Resource
 
 class ForagingAmbient:
-    def __init__(self, grid_size, nest=None, obstacles=None, resources=None, agents=None):
+    def __init__(self, grid_size, nest=None, obstacles=None, resources=None, agent=None):
         self.grid_size = grid_size
         self.nest = nest
         self.obstacles = obstacles if obstacles is not None else []
         self.resources = resources if resources is not None else []
         self.picked_resources = 0
-        self.agents = agents if agents is not None else []
+        self.agent = agent
 
         self.occupiedPositions = set()
         self._rebuild_occupied()
@@ -24,8 +24,8 @@ class ForagingAmbient:
             self.occupiedPositions.add(self.nest.getCoord().as_tuple())
         for r in self.resources:
             self.occupiedPositions.add(r.getCoord().as_tuple())
-        for a in self.agents:
-            self.occupiedPositions.add(a.getCoord().as_tuple())
+        if self.agent is not None: 
+            self.occupiedPositions.add(self.agent.getCoord().as_tuple())
 
     def _coord_to_tuple(self, coord):
         if isinstance(coord, Coord.Coord):
@@ -141,7 +141,7 @@ class ForagingAmbient:
             nest=nest,
             obstacles=obstacles,
             resources=resources,
-            agents=[]
+            agent=None
         )
         ambient.agent_spawns = agent_spawns
 
@@ -216,6 +216,6 @@ class ForagingAmbient:
             draw_cell(c0.getX(), c0.getY(), "red", "R")
 
         # agentes
-        for a in self.agents:
-            c0 = a.getCoord()
-            draw_cell(c0.getX(), c0.getY(), "lightgreen", "A")
+        if self.agent is not None:
+            c0 = self.agent.getCoord()
+        draw_cell(c0.getX(), c0.getY(), "lightgreen", "A")

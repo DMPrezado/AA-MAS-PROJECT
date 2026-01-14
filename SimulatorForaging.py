@@ -13,7 +13,7 @@ class ForagingSimulator:
 
         start_pos = random.choice(self.ambient.freePositions())
         self.agent = ForagingAgent("F0", self.ambient, start_pos)
-
+        self.ambient.agent = self.agent
         self.FITNESS_HISTORY = []
 
 

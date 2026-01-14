@@ -43,8 +43,21 @@ class ForagingAgent(Entity):
         self.last_state = None
         self.last_action = None
 
-        self.ambient.agents.append(self)
         self.ambient.occupiedPositions.add(self.coord.as_tuple())
+
+        self.on_resource=False
+        self.on_nest=False
+
+
+
+    def getX(self):
+m        return self.coord.getX()
+    
+    def getY(self):
+        return self.coord.getY()
+    
+    def getCoord(self):
+        return self.coord
 
     # --------------------------
     # SENSORES
@@ -62,7 +75,7 @@ class ForagingAgent(Entity):
         if not self.ambient.resources:
             return (0, 0)
 
-        agent_x, agent_y = self.coord.x, self.coord.y
+        agent_x, agent_y = self.getX(), self.getY()
         closest_dx, closest_dy = 0, 0
         min_distance = float("inf")
 
@@ -253,96 +266,10 @@ class ForagingAgent(Entity):
     # FIXED POLICY (opcional)
     # --------------------------
 
-    # def fixedPolicyChoice(self):
-    #     """
-    #     Política fixa:
-    #     1) Se estiver em cima de recurso e não tiver -> PICK
-    #     2) Se estiver no ninho e tiver -> DROP
-    #     3) Caso contrário:
-    #         - se não tiver recurso: vai para o recurso mais próximo (greedy por Manhattan)
-    #         - se tiver recurso: vai para o ninho
-    #         - evita Wall/Limit/Fireplace
-    #     """
+    def moveTo(self, newCoord):
+        reward = 0
 
-    #     # 1) PICK se estou em cima do recurso
-    #     if (not self.has_resource) and self.ambient.has_resource_at(self.coord):
-    #         return PICK_ACTION
-
-    #     # 2) DROP se estou no ninho
-    #     here = self.ambient.getObject(self.coord)
-    #     if self.has_resource and isinstance(here, Nest):
-    #         return DROP_ACTION
-
-    #     # 3) Escolher alvo
-    #     if self.has_resource:
-    #         tx, ty = self.ambient.getNest().getCoord().x, self.ambient.getNest().getCoord().y
-    #     else:
-    #         # recurso mais próximo
-    #         if not self.ambient.resources:
-    #             # se já não há recursos, vagueia
-    #             return random.choice([0, 1, 2, 3])
-
-    #         ax, ay = self.coord.x, self.coord.y
-    #         best = None
-    #         best_d = 10**9
-    #         for r in self.ambient.resources:
-    #             rx, ry = r.getCoord().x, r.getCoord().y
-    #             d = abs(rx - ax) + abs(ry - ay)
-    #             if d < best_d:
-    #                 best_d = d
-    #                 best = (rx, ry)
-
-    #         tx, ty = best
-
-    #     # direções possíveis (ação -> (dx,dy))
-    #     directions = {
-    #         0: (0, -1),  # up
-    #         1: (0,  1),  # down
-    #         2: (-1, 0),  # left
-    #         3: (1,  0),  # right
-    #     }
-
-    #     def is_blocked(coord):
-    #         obj = self.ambient.getObject(coord)
-    #         if obj is None:
-    #             return False
-    #         if getattr(obj, "type", None) == "Limit":
-    #             return True
-    #         if isinstance(obj, Obstacle):
-    #             # evita paredes e fogueiras
-    #             t = obj.getType()
-    #             return t in ("Wall", "Fireplace", "Limit")
-    #         return False
-
-    #         # 4) Greedy: escolhe o move que minimiza distância Manhattan ao alvo
-    #     best_actions = []
-    #     best_dist = 10**9
-
-    #     for a, (dx, dy) in directions.items():
-    #         nc = Coord.Coord(self.coord.x + dx, self.coord.y + dy)
-
-    #         if is_blocked(nc):
-    #             continue
-
-    #         d = abs(tx - nc.x) + abs(ty - nc.y)
-    #         if d < best_dist:
-    #             best_dist = d
-    #             best_actions = [a]
-    #         elif d == best_dist:
-    #             best_actions.append(a)
-
-    #     # Se há boas escolhas, escolhe uma (com algum random para fugir a empates)
-    #     if best_actions:
-    #         return random.choice(best_actions)
-
-    #     # 5) fallback: se tudo está bloqueado, tenta qualquer direção não bloqueada
-    #     fallback = [a for a,(dx,dy) in directions.items()
-    #                 if not is_blocked(Coord.Coord(self.coord.x + dx, self.coord.y + dy))]
-    #     if fallback:
-    #         return random.choice(fallback)
-
-    #     # 6) se estiver encurralado total, não mexe (mas como só temos 0..5, devolve um move)
-    #     return random.choice([0, 1, 2, 3])
+        self.coord = newCoord
 
 
 
@@ -367,7 +294,12 @@ class ForagingAgent(Entity):
 
         def is_free(c):
             obj = self.ambient.getObject(c)
-            return (obj is None) or isinstance(obj, Resource) or isinstance(obj, Nest)
+            if isinstance(obj, Resource):
+                return "R"
+            if isinstance(obj, Nest):
+                return "N"
+            if obj is not None:
+                return "O"
 
         def searchResouce():
             resourceCoord_asTuple = self.sensorNearestResourceVector()
@@ -378,8 +310,45 @@ class ForagingAgent(Entity):
                 random.shuffle(directions)
                 for d in directions:
                     c = step(d)
-                    if is_free(c):
-                        return c
+                    if is_free(c) == "R":
+                        self.on_resource=True
+                        return self.coord + c
+                    elif is_free(c) != "O": 
+                        return self.coord + c
+
+    
+        # 3) Caso contrário, usa o ângulo
+            if -45 <= angle <= 45:
+                preferred = [front, left, right, back]
+            elif 45 < angle <= 135:
+                preferred = [left, front, back, right]
+            elif -135 <= angle < -45:
+                preferred = [right, front, back, left]
+            else:
+                preferred = [back, left, right, front]
+
+            for d in preferred:
+                    c = step(d)
+                    if is_free(c) == "R":
+                        self.on_resource=True
+                        return self.coord + c
+                    elif is_free(c) != "O": 
+                        return self.coord + c
+                
+        def searchNest():
+            nestCoord_asTuple = self.sensorNestVector()
+            angle = sensorDirection(nestCoord_asTuple)
+            
+            if random.random() < 0.45:
+                directions = [front, left, right, back]
+                random.shuffle(directions)
+                for d in directions:
+                    c = step(d)
+                    if is_free(c) == "N":
+                        self.on_nest=True
+                        return self.coord + c
+                    elif is_free(c) != "O": 
+                        return self.coord + c
 
     
         # 3) Caso contrário, usa o ângulo
@@ -394,50 +363,37 @@ class ForagingAgent(Entity):
 
             for d in preferred:
                 c = step(d)
-                if is_free(c):
-                    return c
+                if is_free(c) == "N":
+                    self.on_nest=True
+                    return self.coord + c
+                elif is_free(c) != "O": 
+                    return self.coord + c
 
+        def pick():
+            self.on_resource=False
+            self.ambient.remove_resource_at(self.coord)
+            self.has_resource = True
+            return self.coord  # ação de PICK
+        
+        def drop():
+            self.on_nest=False
+            self.has_resource = False
+            self.ambient.picked_resources += 1
+            return self.coord  # ação de DROP
 
         carrying = self.has_resource
 
         if not carrying:
-            self.
-        # PICK
-        if not carrying and on_resource:
-            return PICK_ACTION
+            self.moveTo(searchResouce())
+        if not carrying and self.on_resource:
+            pick()
 
-        # DROP
-        if carrying and on_nest:
-            return DROP_ACTION
-
-        # vetor alvo
         if carrying:
-            dx, dy = nest_dx, nest_dy
-        else:
-            dx, dy = resource_dx, resource_dy
+            self.moveTo(searchNest())
+        if carrying and self.on_nest:
+            drop()
 
-        possible_actions = []
 
-        if dy == -1 and not blocked_up:
-            possible_actions.append(0)   # up
-        if dy == 1 and not blocked_down:
-            possible_actions.append(1)   # down
-        if dx == -1 and not blocked_left:
-            possible_actions.append(2)   # left
-        if dx == 1 and not blocked_right:
-            possible_actions.append(3)   # right
-
-        # fallback: qualquer direção livre
-        if not possible_actions:
-            if not blocked_up: possible_actions.append(0)
-            if not blocked_down: possible_actions.append(1)
-            if not blocked_left: possible_actions.append(2)
-            if not blocked_right: possible_actions.append(3)
-
-        if not possible_actions:
-            return random.choice([0, 1, 2, 3])
-
-        return random.choice(possible_actions)
 
     
 
@@ -448,15 +404,12 @@ class ForagingAgent(Entity):
             return
         if Conf.MOVE_WITH_QLEARNING:
             action = self.movementChoice()
+            self.apply_action(action)
         elif Conf.MOVE_WITH_FIXED_POLICIES:
-            action = self.fixedPolicyChoice()
-            # para o fixed também faz sentido guardar isto (assim apply_action pode atualizar Q se quiseres)
-            self.last_state = self.get_state()
-            self.last_action = action
+            self.fixedPolicyChoice()
         else:
             raise ValueError("Config inválida em ConfForaging.py")
 
-        self.apply_action(action)
 
 
 
