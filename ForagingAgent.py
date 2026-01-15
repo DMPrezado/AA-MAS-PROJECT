@@ -1,6 +1,7 @@
 import math
 import random
 import Coord
+from collections import deque
 from Entity import Entity
 from Obstacle import Obstacle
 from Nest import Nest
@@ -42,6 +43,9 @@ class ForagingAgent(Entity):
 
         self.last_state = None
         self.last_action = None
+        # histórico das últimas posições para detecção de oscilação (A,B,A,B,...)
+        self.pos_history = deque(maxlen=6)
+        self.oscillating = False
 
         self.ambient.agents.append(self)
         self.ambient.occupiedPositions.add(self.coord.as_tuple())
@@ -130,7 +134,7 @@ class ForagingAgent(Entity):
 
     def movementChoice(self):
         state = self.get_state()
-        # definir ações banidas: não permitir PICK se não houver recurso aqui; não permitir DROP se não estiver no ninho ou não tiver recurso
+        # definir ações banidas: não permitir PICK se não houver recurso aqui; não permitir DROP se não estivermos no ninho ou não tiver recurso
         banned = set()
         if not self.ambient.has_resource_at(self.coord):
             banned.add(PICK_ACTION)
@@ -145,8 +149,10 @@ class ForagingAgent(Entity):
             banned_actions=banned,
             task="foraging"
         )
-        self.last_state = state
-        self.last_action = action
+        # guardar estado/ação apenas se estivermos em Q-learning
+        if Conf.MOVE_WITH_QLEARNING:
+            self.last_state = state
+            self.last_action = action
         return action
 
     # --------------------------
@@ -211,6 +217,34 @@ class ForagingAgent(Entity):
                 elif new_d > old_d:
                     reward += Conf.REWARD_MOVE_AWAY_TARGET
 
+                # registar posição no histórico e detetar oscilações (A,B,A,B,...)
+                try:
+                    self.pos_history.append(self.coord.as_tuple())
+                except Exception:
+                    self.pos_history.append((self.coord.x, self.coord.y))
+
+                # detectar alternância repetida entre duas posições
+                if len(self.pos_history) >= 4:
+                    positions = list(self.pos_history)
+                    unique_positions = set(positions)
+                    if len(unique_positions) == 2:
+                        alternates = True
+                        for i in range(2, len(positions)):
+                            if positions[i] != positions[i-2]:
+                                alternates = False
+                                break
+                        if alternates and (not self.oscillating):
+                            reward += Conf.PENALTY_REPEAT_MOVE
+                            self.oscillating = True
+                    else:
+                        # se já não alterna entre duas posições, sair do estado de oscilação
+                        if self.oscillating:
+                            self.oscillating = False
+            else:
+                # se o movimento não foi bem sucedido, limpar histórico e flag de oscilação
+                self.pos_history.clear()
+                self.oscillating = False
+
         # ---------------- PICK ----------------
         elif action == PICK_ACTION:
             if (not self.has_resource) and self.ambient.has_resource_at(self.coord):
@@ -220,6 +254,9 @@ class ForagingAgent(Entity):
                     self.steps_since_pickup = 0
                     self.steps_carrying = 0
                     reward += Conf.REWARD_PICK_RESOURCE
+                    # ao apanhar recurso, reset do histórico de posições e flag
+                    self.pos_history.clear()
+                    self.oscillating = False
                 else:
                     reward += Conf.REWARD_INVALID_PICK
             else:
@@ -234,6 +271,9 @@ class ForagingAgent(Entity):
                 self.steps_carrying = 0
                 reward += Conf.REWARD_DROP_IN_NEST
                 self.ambient.picked_resources += 1
+                # ao dropar no ninho, reset do histórico de posições e flag
+                self.pos_history.clear()
+                self.oscillating = False
             else:
                 reward += Conf.REWARD_INVALID_DROP
 
@@ -369,4 +409,3 @@ class ForagingAgent(Entity):
             raise ValueError("Config inválida em ConfForaging.py")
 
         self.apply_action(action)
-
