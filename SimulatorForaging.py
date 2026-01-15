@@ -5,10 +5,15 @@ import qlearning
 from ForagingAmbient import ForagingAmbient
 from ForagingAgent import ForagingAgent
 from ConfForaging import ConfigForaging as Conf
+import numpy as np
+import matplotlib.pyplot as plt
 
 class ForagingSimulator:
     def __init__(self):
         self.ambient = ForagingAmbient.from_txt(Conf.FILE_EPISODES_MAP)
+
+        w, h = self.ambient.grid_size
+        self.HEATMAP_VISITS = np.zeros((h, w), dtype=int)
 
         start_pos = random.choice(self.ambient.freePositions())
         self.agent = ForagingAgent("F0", self.ambient, start_pos)
@@ -27,6 +32,7 @@ class ForagingSimulator:
         self.testar()
 
         self.plot_results()
+        self.plot_heatmap()
 
     def reset_episode(self):
         self.ambient.occupiedPositions.discard(self.agent.coord.as_tuple())
@@ -42,9 +48,12 @@ class ForagingSimulator:
         self.agent.last_state = None
         self.agent.last_action = None
 
-    def run_episode(self, max_steps, render=False, delay=0.08):
+    def run_episode(self, max_steps, render=False, delay=0.08, heatmap=None):
         for t in range(max_steps):
             self.agent.executar()
+
+            if heatmap is not None:
+                heatmap[self.agent.coord.y, self.agent.coord.x] += 1
 
             if render and hasattr(self.ambient, "root") and self.ambient.root.winfo_exists():
                 self.ambient.render_window()
@@ -92,7 +101,12 @@ class ForagingSimulator:
 
             self.ambient.init_render_window()
             print(f"\n--- TESTE {i+1}/{N_TEST} ---")
-            fit = self.run_episode(max_steps=Conf.MAX_STEPS_PER_EPISODE, render=True, delay=0.08)
+            fit = self.run_episode(
+                max_steps=Conf.MAX_STEPS_PER_EPISODE,
+                render=True,
+                delay=0.08,
+                heatmap=self.HEATMAP_VISITS
+            )
             total += fit
             print(f"Resultado: fitness={fit}")
 
@@ -108,6 +122,32 @@ class ForagingSimulator:
         plt.ylabel("Fitness")
         plt.grid()
         plt.show()
+
+
+    def plot_heatmap(self):
+        visits = self.HEATMAP_VISITS.copy()
+
+        plt.figure()
+        plt.title("Heatmap de visitas (TESTE) – Foraging")
+        plt.xlabel("x")
+        plt.ylabel("y")
+
+        # Heatmap base
+        plt.imshow(visits, origin="upper")
+        plt.colorbar(label="Nº de visitas")
+
+        # --------- OBSTÁCULOS A PRETO ---------
+        for o in self.ambient.obstacles:
+            x, y = o.getCoord().x, o.getCoord().y
+            plt.scatter(x, y, marker="s", s=300, c="black")
+
+        # --------- NINHO ---------
+        if self.ambient.getNest() is not None:
+            n = self.ambient.getNest().getCoord()
+            plt.scatter(n.x, n.y, marker="s", s=250)
+
+        plt.show()
+    
 
 
 if __name__ == "__main__":

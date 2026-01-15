@@ -7,7 +7,8 @@ import qlearning
 import random
 import time
 from Conf import ConfigLightHouse as Conf
-
+import numpy as np
+import matplotlib.pyplot as plt
 
 class Simulator:
     def __init__(self):
@@ -15,6 +16,13 @@ class Simulator:
         # # Init do ambiente a partir do ficheiro de mapas
         # # --------------------------
         self.ambient = Ambient.from_txt(Conf.FILE_EPISODES_INITIAL_POSITIONS)
+
+
+        w, h = self.ambient.grid_size
+        self.HEATMAP_VISITS = np.zeros((h, w), dtype=int)  # [y][x]
+
+
+
 
         # cria 1 agente
         start_pos = random.choice(self.ambient.freePositions())
@@ -37,6 +45,8 @@ class Simulator:
         #TODO: implementar plotagem dos resultados
         self.plot_results()
         
+
+        self.plot_heatmap()
         
     def reset_agent_random(self, ambient, agent):
         """Reinicia o agente numa posição aleatória livre (sem reset da Q-table)."""
@@ -49,9 +59,15 @@ class Simulator:
         agent.prev_pos = None
         agent.fitness = 0
 
-    def run_episode(self, ambient, agent, max_steps=80, render_each_step=False, delay=0.1):
+    def run_episode(self, ambient, agent, max_steps=80, render_each_step=False, delay=0.1, heatmap=None):
         for t in range(max_steps):
             agent.executar()
+
+            # contar visita (após executar o passo)
+            if heatmap is not None:
+                heatmap[agent.coord.y, agent.coord.x] += 1
+
+
 
             if render_each_step and hasattr(self.ambient, "root") and self.ambient.root.winfo_exists():
                 self.ambient.render_window()
@@ -112,8 +128,9 @@ class Simulator:
             steps, fit, done = self.run_episode(
                 self.ambient, self.agent,
                 max_steps=MAX_STEPS_TEST,
-                render_each_step=True,   # <- volta a mostrar movimentos como antes
-                delay=0.10               # ajusta a velocidade
+                render_each_step=True,
+                delay=0.10,
+                heatmap=self.HEATMAP_VISITS
             )
 
             total_fitness += fit
@@ -135,6 +152,33 @@ class Simulator:
         plt.ylabel("Fitness")
         plt.grid()
         plt.show()
+
+    def plot_heatmap(self):
+        visits = self.HEATMAP_VISITS.copy()
+        h, w = visits.shape
+
+        # Base: heatmap normal
+        plt.figure()
+        plt.title("Heatmap de visitas (TESTE) – Lighthouse")
+        plt.xlabel("x")
+        plt.ylabel("y")
+
+        # Heatmap das visitas
+        plt.imshow(visits, origin="upper")
+        plt.colorbar(label="Nº de visitas")
+
+        # --------- DESENHAR OBSTÁCULOS A PRETO ---------
+        for o in self.ambient.obstacles:
+            x, y = o.getCoord().x, o.getCoord().y
+            plt.scatter(x, y, marker="s", s=300, c="black")
+
+        # --------- DESENHAR FAROL ---------
+        lh = self.ambient.getLightHouse().getCoord()
+        plt.scatter(lh.x, lh.y, marker="*", s=250)
+
+        plt.show()
+
+    
 
 
 
