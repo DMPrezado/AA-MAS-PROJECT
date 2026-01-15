@@ -23,16 +23,17 @@
 # LighthouseAgent.py
 import math
 import random
-import Coord
 from collections import deque
+
+import Coord
+from ConfLighthouse import ConfigLightHouse as Conf
 from Entity import Entity
 from LightHouse import LightHouse
 from Obstacle import Obstacle
 from qlearning import ACTIONS, choose_action, update_Q
-from ConfLighthouse import ConfigLightHouse as Conf
 
 
-class Agent(Entity):
+class LighthouseAgent(Entity):
     def __init__(self, name, ambient, pos):
         super().__init__(pos)
         self.type = "Agent"

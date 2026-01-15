@@ -1,11 +1,13 @@
 # ForagingSimulator.py
 import random
 import time
-from Resource import Resource
+
 import qlearning
-from ForagingAmbient import ForagingAmbient
-from ForagingAgent import ForagingAgent
 from ConfForaging import ConfigForaging as Conf
+from ForagingAgent import ForagingAgent
+from ForagingAmbient import ForagingAmbient
+from Resource import Resource
+
 
 class ForagingSimulator:
     def __init__(self):

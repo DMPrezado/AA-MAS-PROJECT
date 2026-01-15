@@ -1,8 +1,8 @@
 # ForagingAmbient.py
 import Coord
-from Obstacle import Obstacle
 from Nest import Nest
-from Resource import Resource
+from Obstacle import Obstacle
+
 
 class ForagingAmbient:
     def __init__(self, grid_size, nest=None, obstacles=None, resources=None, agents=None):

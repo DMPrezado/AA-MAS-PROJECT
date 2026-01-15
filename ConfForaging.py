@@ -10,8 +10,8 @@ class ConfigForaging:
     # ------------------------
     # MAP FILE
     # ------------------------
-    FILE_EPISODES_MAP = "maps/foraging_map1.txt"
-    #FILE_EPISODES_MAP = "maps/foraging_map_large.txt"
+    #FILE_EPISODES_MAP = "maps/foraging_map1.txt"
+    FILE_EPISODES_MAP = "maps/foraging_map_large.txt"
 
     # ------------------------
     # TRAINING
@@ -19,7 +19,7 @@ class ConfigForaging:
     NUMBER_EPISODES = 1000
     RENDER_DURING_TRAINING = False
     NUMBER_RESOURCES = 3
-    MAX_STEPS_PER_EPISODE = 250*NUMBER_RESOURCES  # ajustar conforme o número de recursos
+    MAX_STEPS_PER_EPISODE = 300*NUMBER_RESOURCES  # ajustar conforme o número de recursos
 
     # ------------------------
     # STEP SENSOR
@@ -30,19 +30,19 @@ class ConfigForaging:
     # EXPLORATION (ε-greedy)
     # ------------------------
     EXPLORATION_INITIAL = 1.0
-    EXPLORATION_FINAL = 0.2
-    EXPLORATION_DECAY = 0.995
+    EXPLORATION_FINAL = 0.35
+    EXPLORATION_DECAY = 0.997
 
     # ------------------------
     # BASE COST
     # ------------------------
     # custo base por passo: ligeiramente maior para desencorajar movimentos inúteis
-    STEP_COST = -0.10
+    STEP_COST = -0.2
 
     # ------------------------
     # REWARDS / PENALTIES
     # ------------------------
-    REWARD_PICK_RESOURCE = 100
+    REWARD_PICK_RESOURCE = 250
     REWARD_DROP_IN_NEST  = 500
 
     REWARD_HIT_WALL_OR_LIMIT = -5
@@ -54,7 +54,7 @@ class ConfigForaging:
 
     # penalizações a cada 5 passos (leves)
     # torna a penalização por falta de progresso mais severa (dissuadir ficar a oscilar)
-    PENALTY_5_STEPS_NO_PICKUP = -6
+    PENALTY_5_STEPS_NO_PICKUP = -1
     PENALTY_5_STEPS_CARRYING  = -2
 
     # shaping (aproximar/afastar do alvo)
@@ -69,7 +69,7 @@ class ConfigForaging:
     # VISIBILITY SENSOR REWARDS
     # ------------------------
     # recompensa por ver um recurso (passar de não-ver para ver)
-    VISIBILITY_GAIN = 10
+    VISIBILITY_GAIN = 5
     # penalização por deixar de ver um recurso (passar de ver para não-ver)
-    VISIBILITY_LOSS = -5
+    VISIBILITY_LOSS = -4
 

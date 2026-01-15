@@ -1,20 +1,18 @@
-from Coord import Coord
-from LightHouse import LightHouse
-from LighthouseAmbient import Ambient
-from Obstacle import Obstacle
-from LighthouseAgent import Agent
-import qlearning
 import random
 import time
+
+import qlearning
 from ConfLighthouse import ConfigLightHouse as Conf
+from LighthouseAgent import LighthouseAgent
+from LighthouseAmbient import LighthouseAmbient
 
 
-class Simulator:
+class SimulatorLighthouse:
     def __init__(self):
         # # --------------------------
         # # Init do ambiente a partir do ficheiro de mapas
         # # --------------------------
-        self.ambient = Ambient.from_txt(Conf.FILE_EPISODES_INITIAL_POSITIONS)
+        self.ambient = LighthouseAmbient.from_txt(Conf.FILE_EPISODES_INITIAL_POSITIONS)
 
         # inicializar parâmetros de exploração (ε) a partir da config
         import qlearning as _q
@@ -25,7 +23,7 @@ class Simulator:
 
         # cria 1 agente
         start_pos = random.choice(self.ambient.freePositions())
-        self.agent = Agent("A0", self.ambient, start_pos)
+        self.agent = LighthouseAgent("A0", self.ambient, start_pos)
 
         self.FITNESS_HISTORY = []
 
@@ -149,4 +147,4 @@ class Simulator:
 
 
 if __name__ == "__main__":
-    Simulator()
+    SimulatorLighthouse()

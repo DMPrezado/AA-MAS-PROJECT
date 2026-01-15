@@ -3,9 +3,9 @@
 import Coord
 from LightHouse import LightHouse
 from Obstacle import Obstacle
-import tkinter as tk
 
-class Ambient:
+
+class LighthouseAmbient:
     def __init__(self, grid_size, lighthouse=None, obstacles=None, agents=None):
         self.grid_size = grid_size  # (width, height)
         self.lighthouse = lighthouse
@@ -262,7 +262,7 @@ class Ambient:
                     # vazio ou desconhecido
                     pass
 
-        ambient = Ambient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])
+        ambient = LighthouseAmbient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])
 
         # guardamos as posições iniciais possíveis para o main usar
         ambient.agent_spawns = agent_spawns
@@ -284,4 +284,4 @@ class Ambient:
             Obstacle(Coord.Coord(2, 6), "Fireplace"),
         ]
 
-        return Ambient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])
+        return LighthouseAmbient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])

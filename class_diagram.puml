@@ -35,10 +35,12 @@ class Obstacle {
 
 class LightHouse {
   +__init__(coord)
+  +getCoord()
 }
 
 class Nest {
   +__init__(coord)
+  +getCoord()
 }
 
 class Resource {
@@ -56,6 +58,9 @@ class Agent {
   -last_action
   -movable: bool
   -type: str
+  -prev_pos
+  -pos_history
+  -oscillating: bool
   +__init__(name, ambient, pos)
   +getObject(coord)
   +_sense_in_direction(direction)
@@ -83,10 +88,14 @@ class ForagingAgent {
   -steps_carrying: int
   -last_state
   -last_action
+  -saw_resource_prev: bool
+  -pos_history: deque
+  -oscillating: bool
   +__init__(name, ambient, pos)
   +sensorNestVector()
   +sensorNearestResourceVector()
   +_coord_after_move(action)
+  +seesResource(): bool
   +get_state()
   +movementChoice()
   +apply_action(action)
@@ -119,8 +128,8 @@ class Ambient {
 class ForagingAmbient {
   -grid_size: (width,height)
   -nest: Nest
-  -obstacles: List[Obstacle]
-  -resources: List[Resource]
+  -obstacles: List<Obstacle>
+  -resources: List<Resource>
   -agents: List[ForagingAgent]
   -occupiedPositions: set<(x,y)>
   -picked_resources: int
@@ -138,6 +147,48 @@ class ForagingAmbient {
   +init_render_window()
   +_on_close()
   +render_window()
+}
+
+class ConfigForaging {
+  +MODE
+  +NUMBER_EPISODES
+  +NUMBER_RESOURCES
+  +MAX_STEPS_PER_EPISODE
+  +FRONT_SENSOR_MAX_DIST
+  +EXPLORATION_INITIAL
+  +EXPLORATION_FINAL
+  +EXPLORATION_DECAY
+  +STEP_COST
+  +REWARD_PICK_RESOURCE
+  +REWARD_DROP_IN_NEST
+  +REWARD_HIT_WALL_OR_LIMIT
+  +REWARD_IN_FIREPLACE
+  +REWARD_INVALID_PICK
+  +REWARD_INVALID_DROP
+  +PENALTY_5_STEPS_NO_PICKUP
+  +PENALTY_5_STEPS_CARRYING
+  +REWARD_MOVE_CLOSER_TARGET
+  +REWARD_MOVE_AWAY_TARGET
+  +PENALTY_REPEAT_MOVE
+  +VISIBILITY_GAIN
+  +VISIBILITY_LOSS
+}
+
+class ConfigLightHouse {
+  +MODE
+  +NUMBER_EPISODES
+  +MAX_STEPS_PER_EPISODE
+  +RENDER_DURING_TRAINING
+  +N_TEST
+  +EXPLORATION_INITIAL
+  +EXPLORATION_FINAL
+  +EXPLORATION_DECAY
+  +REWARD_REACH_GOAL
+  +REWARD_STEP_CLOSER
+  +REWARD_STEP_AWAY
+  +REWARD_HIT_WALL
+  +REWARD_IN_FIREPLACE
+  +REWARD_HIT_OBJECT
 }
 
 class qlearning {

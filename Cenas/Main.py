@@ -2,10 +2,10 @@
 
 import random
 import time
-import qlearning
 
-from LighthouseAmbient import Ambient
-from LighthouseAgent import Agent
+import qlearning
+from LighthouseAgent import LighthouseAgent
+from LighthouseAmbient import LighthouseAmbient
 
 """
     Precisamos de importar:
@@ -41,8 +41,8 @@ def run_episode(ambient, agent, max_steps, render=False, delay=0.08):
 
 def main():
     # 1) criar mapa dentro do ambiente
-    ambient = Ambient.demo_map()
-    agent = Agent("A0", ambient, random.choice(ambient.freePositions()))
+    ambient = LighthouseAmbient.demo_map()
+    agent = LighthouseAgent("A0", ambient, random.choice(ambient.freePositions()))
 
     # 2) TREINO
     N_TRAIN = 200
