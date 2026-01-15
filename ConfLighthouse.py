@@ -7,7 +7,7 @@ class ConfigLightHouse:
     # ------------------------
     # "fixed"      -> política fixa (heurística)
     # "qlearning"  -> aprendizagem Q-learning
-    MODE = "fixed"   # ALTERA AQUI ou via terminal (ver SimulatorLighthouse.py)
+    MODE = "qlearning"   # ALTERA AQUI ou via terminal (ver SimulatorLighthouse.py)
 
     MOVE_WITH_FIXED_POLICIES = (MODE == "fixed")
     MOVE_WITH_QLEARNING = (MODE == "qlearning")
@@ -23,9 +23,9 @@ class ConfigLightHouse:
     # ------------------------
     # TRAINING PARAMETERS
     # ------------------------
-    NUMBER_EPISODES = 300
+    NUMBER_EPISODES = 600
     #MAX_STEPS_PER_EPISODE = 200 #problemas pequenos
-    MAX_STEPS_PER_EPISODE = 300  #problemas/mapas grandes
+    MAX_STEPS_PER_EPISODE = 400  #problemas/mapas grandes
     RENDER_DURING_TRAINING = False
     N_TEST = 10
 

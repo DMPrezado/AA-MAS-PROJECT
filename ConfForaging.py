@@ -10,7 +10,7 @@ class ConfigForaging:
     # ------------------------
     # MAP FILE
     # ------------------------
-    FILE_EPISODES_MAP = "maps/foraging_map1.txt"
+    FILE_EPISODES_MAP = "maps/foraging_map_large.txt"
     #FILE_EPISODES_MAP = "maps/foraging_map_large.txt"
 
     # ------------------------
@@ -19,7 +19,7 @@ class ConfigForaging:
     NUMBER_EPISODES = 1000
     RENDER_DURING_TRAINING = False
     NUMBER_RESOURCES = 3
-    MAX_STEPS_PER_EPISODE = 250*NUMBER_RESOURCES  # ajustar conforme o número de recursos
+    MAX_STEPS_PER_EPISODE = 300*NUMBER_RESOURCES  # ajustar conforme o número de recursos
 
     # ------------------------
     # STEP SENSOR

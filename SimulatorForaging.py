@@ -7,7 +7,7 @@ from ForagingAmbient import ForagingAmbient
 from ForagingAgent import ForagingAgent
 from ConfForaging import ConfigForaging as Conf
 
-# --- NOVO: imports para heatmap ---
+# --- HEATMAP ---
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -22,7 +22,7 @@ class ForagingSimulator:
         _q.EPSILON_MIN = Conf.EXPLORATION_FINAL
         _q.EPSILON_DECAY = Conf.EXPLORATION_DECAY
 
-        # --- NOVO: matriz de visitas (heatmap) ---
+        # --- MATRIZ DE VISITAS (HEATMAP DO TREINO) ---
         w, h = self.ambient.grid_size
         self.HEATMAP_VISITS = np.zeros((h, w), dtype=int)  # [y][x]
 
@@ -44,7 +44,7 @@ class ForagingSimulator:
         # Apenas plotar resultados se estivermos em Q-learning (modo fixed não deve abrir GUI)
         if Conf.MOVE_WITH_QLEARNING:
             self.plot_results()
-            self.plot_heatmap()  # --- NOVO: mostra heatmap no fim ---
+            self.plot_heatmap()   # heatmap das visitas durante o TREINO
 
 
     def reset_episode(self):
@@ -62,14 +62,14 @@ class ForagingSimulator:
         self.agent.last_action = None
 
 
-    # --- ALTERADO: run_episode recebe heatmap e conta visitas ---
+    # --- run_episode genérico: só conta no heatmap se for passado ---
     def run_episode(self, max_steps, render=False, delay=0.08, heatmap=None):
         for t in range(max_steps):
             self.agent.executar()
 
-            # contar visita (depois do passo)
+            # HEATMAP: contar visita (se heatmap não for None)
             if heatmap is not None:
-                heatmap[self.agent.coord.y, self.agent.coord.x] += 1
+                self.HEATMAP_VISITS[self.agent.coord.y, self.agent.coord.x] += 1
 
             if render and hasattr(self.ambient, "root") and self.ambient.root.winfo_exists():
                 self.ambient.render_window()
@@ -85,6 +85,10 @@ class ForagingSimulator:
 
     def treinar(self):
         print("=== TREINO FORAGING ===")
+
+        # garantir que o heatmap começa a zeros
+        self.HEATMAP_VISITS.fill(0)
+
         for ep in range(Conf.NUMBER_EPISODES):
             # recarregar mapa para episódios limpos
             self.ambient = ForagingAmbient.from_txt(Conf.FILE_EPISODES_MAP)
@@ -92,6 +96,7 @@ class ForagingSimulator:
             start = random.choice(self.ambient.freePositions())
             self.agent = ForagingAgent("F0", self.ambient, start)
 
+            # criar recursos no mapa
             for _ in range(Conf.NUMBER_RESOURCES):
                 randPosition = random.choice(self.ambient.freePositions())
                 self.ambient.resources.append(Resource(randPosition))
@@ -101,9 +106,11 @@ class ForagingSimulator:
                 except Exception:
                     self.ambient.occupiedPositions.add((randPosition.x, randPosition.y))
 
+            # PASSAMOS heatmap -> conta visitas do TREINO
             steps, fit, done = self.run_episode(
                 max_steps=Conf.MAX_STEPS_PER_EPISODE,
-                render=Conf.RENDER_DURING_TRAINING
+                render=Conf.RENDER_DURING_TRAINING,
+                heatmap=self.HEATMAP_VISITS
             )
 
             # guarda fitness
@@ -121,9 +128,6 @@ class ForagingSimulator:
     def testar(self):
         print("\n=== TESTE FORAGING (policy aprendida) ===")
         qlearning.EPSILON = 0.0
-
-        # --- NOVO: reset do heatmap (para ser só dos testes) ---
-        self.HEATMAP_VISITS.fill(0)
 
         N_TEST = 2
         total = 0
@@ -146,18 +150,16 @@ class ForagingSimulator:
             self.ambient.init_render_window()
             print(f"\n--- TESTE {i+1}/{N_TEST} ---")
 
-            # --- ALTERADO: passa heatmap para contar visitas ---
+            # AQUI não passamos heatmap → não altera a matriz do treino
             steps, fit, done = self.run_episode(
                 max_steps=Conf.MAX_STEPS_PER_EPISODE,
                 render=True,
-                delay=0.08,
-                heatmap=self.HEATMAP_VISITS
+                delay=0.08
             )
 
             total += fit
             if done:
                 wins += 1
-
             print(f"Resultado teste {i+1}: done={done} | steps={steps} | fitness_final={fit}")
 
         print("\n=== RESUMO TESTES ===")
@@ -175,12 +177,12 @@ class ForagingSimulator:
         plt.show()
 
 
-    # --- NOVO: heatmap com obstáculos a preto ---
+    # --- HEATMAP com obstáculos a preto + ninho marcado ---
     def plot_heatmap(self):
         visits = self.HEATMAP_VISITS.copy()
 
         plt.figure()
-        plt.title("Heatmap de visitas (TESTE) – Foraging")
+        plt.title("Heatmap de visitas (TREINO) – Foraging")
         plt.xlabel("x")
         plt.ylabel("y")
 
@@ -188,12 +190,12 @@ class ForagingSimulator:
         plt.imshow(visits, origin="upper")
         plt.colorbar(label="Nº de visitas")
 
-        # obstáculos a preto (Wall/Fireplace/etc.)
+        # obstáculos a preto
         for o in self.ambient.obstacles:
             x, y = o.getCoord().x, o.getCoord().y
             plt.scatter(x, y, marker="s", s=300, c="black")
 
-        # ninho (marcador por cima)
+        # ninho
         if self.ambient.getNest() is not None:
             n = self.ambient.getNest().getCoord()
             plt.scatter(n.x, n.y, marker="s", s=250)

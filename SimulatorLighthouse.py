@@ -8,7 +8,7 @@ import random
 import time
 from ConfLighthouse import ConfigLightHouse as Conf
 
-# --- NOVO: heatmap ---
+# --- HEATMAP ---
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -27,7 +27,7 @@ class Simulator:
         _q.EPSILON_MIN = getattr(Conf, "EXPLORATION_FINAL", _q.EPSILON_MIN)
         _q.EPSILON_DECAY = getattr(Conf, "EXPLORATION_DECAY", _q.EPSILON_DECAY)
 
-        # --- NOVO: matriz de visitas (heatmap) ---
+        # --- MATRIZ DE VISITAS (HEATMAP DO TREINO) ---
         w, h = self.ambient.grid_size
         self.HEATMAP_VISITS = np.zeros((h, w), dtype=int)  # [y][x]
 
@@ -53,7 +53,7 @@ class Simulator:
         # Plot dos resultados da aprendizagem e dos testes (omitido em fixed policy)
         if Conf.MOVE_WITH_QLEARNING:
             self.plot_results()
-            self.plot_heatmap()   # --- NOVO: mostrar heatmap no fim ---
+            self.plot_heatmap()   # heatmap das visitas durante o TREINO
 
 
     def reset_agent_random(self, ambient, agent):
@@ -68,12 +68,13 @@ class Simulator:
         agent.fitness = 0
 
 
-    # --- ALTERADO: run_episode recebe heatmap e conta visitas ---
-    def run_episode(self, ambient, agent, max_steps=80, render_each_step=False, delay=0.1, heatmap=None):
+    # run_episode genérico: só conta no heatmap se for passado
+    def run_episode(self, ambient, agent, max_steps=80,
+                    render_each_step=False, delay=0.1, heatmap=None):
         for t in range(max_steps):
             agent.executar()
 
-            # --- HEATMAP: contar visita (depois do passo) ---
+            # HEATMAP: contar visita (se heatmap não for None)
             if heatmap is not None:
                 heatmap[agent.coord.y, agent.coord.x] += 1
 
@@ -94,12 +95,19 @@ class Simulator:
         MAX_STEPS_TRAIN = Conf.MAX_STEPS_PER_EPISODE
 
         print("=== TREINO ===")
+
+        # opcional: garantir que começamos o heatmap a zeros
+        self.HEATMAP_VISITS.fill(0)
+
         for ep in range(N_TRAIN):
             self.reset_agent_random(self.ambient, self.agent)
+
+            # PASSAMOS O HEATMAP AQUI → conta visitas do TREINO
             steps, fit, done = self.run_episode(
                 self.ambient, self.agent,
                 max_steps=MAX_STEPS_TRAIN,
-                render_each_step=Conf.RENDER_DURING_TRAINING
+                render_each_step=Conf.RENDER_DURING_TRAINING,
+                heatmap=self.HEATMAP_VISITS
             )
 
             # Guardar Fitness
@@ -122,9 +130,6 @@ class Simulator:
         # no teste queremos a política greedy
         qlearning.EPSILON = 0.0
 
-        # --- NOVO: reset heatmap para ser só dos testes ---
-        self.HEATMAP_VISITS.fill(0)
-
         N_TEST = Conf.N_TEST
         MAX_STEPS_TEST = 50
 
@@ -137,12 +142,13 @@ class Simulator:
             self.reset_agent_random(self.ambient, self.agent)
 
             print(f"\n--- TESTE {test_i+1}/{N_TEST} ---")
+
+            # AQUI **NÃO** PASSAMOS HEATMAP → não mexe na matriz
             steps, fit, done = self.run_episode(
                 self.ambient, self.agent,
                 max_steps=MAX_STEPS_TEST,
                 render_each_step=True,
-                delay=0.10,
-                heatmap=self.HEATMAP_VISITS  # --- NOVO: contar visitas ---
+                delay=0.10
             )
 
             total_fitness += fit
@@ -165,12 +171,12 @@ class Simulator:
         plt.show()
 
 
-    # --- NOVO: heatmap com obstáculos a preto ---
+    # HEATMAP com obstáculos a preto + farol marcado
     def plot_heatmap(self):
         visits = self.HEATMAP_VISITS.copy()
 
         plt.figure()
-        plt.title("Heatmap de visitas (TESTE) – Lighthouse")
+        plt.title("Heatmap de visitas (TREINO) – Lighthouse")
         plt.xlabel("x")
         plt.ylabel("y")
 
@@ -178,7 +184,7 @@ class Simulator:
         plt.imshow(visits, origin="upper")
         plt.colorbar(label="Nº de visitas")
 
-        # Obstáculos a preto (Wall/Fireplace/Limit etc.)
+        # Obstáculos a preto
         for o in self.ambient.obstacles:
             x, y = o.getCoord().x, o.getCoord().y
             plt.scatter(x, y, marker="s", s=300, c="black")
