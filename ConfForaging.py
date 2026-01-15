@@ -16,10 +16,10 @@ class ConfigForaging:
     # ------------------------
     # TRAINING
     # ------------------------
-    NUMBER_EPISODES = 700
-    MAX_STEPS_PER_EPISODE = 1000
+    NUMBER_EPISODES = 1000
     RENDER_DURING_TRAINING = False
     NUMBER_RESOURCES = 3
+    MAX_STEPS_PER_EPISODE = 250*NUMBER_RESOURCES  # ajustar conforme o número de recursos
 
     # ------------------------
     # STEP SENSOR
@@ -63,4 +63,13 @@ class ConfigForaging:
     REWARD_MOVE_AWAY_TARGET   = -2
 
     # penalidade para movimentos de ida-e-volta (oscilações)
-    PENALTY_REPEAT_MOVE = -3
+    PENALTY_REPEAT_MOVE = -2
+
+    # ------------------------
+    # VISIBILITY SENSOR REWARDS
+    # ------------------------
+    # recompensa por ver um recurso (passar de não-ver para ver)
+    VISIBILITY_GAIN = 10
+    # penalização por deixar de ver um recurso (passar de ver para não-ver)
+    VISIBILITY_LOSS = -5
+

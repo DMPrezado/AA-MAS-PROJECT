@@ -43,6 +43,10 @@ class ForagingAgent(Entity):
 
         self.last_state = None
         self.last_action = None
+
+        # sensor de visibilidade: estado anterior (não presuponho que veja nada no início)
+        self.saw_resource_prev = False
+
         # histórico das últimas posições para detecção de oscilação (A,B,A,B,...)
         self.pos_history = deque(maxlen=6)
         self.oscillating = False
@@ -87,6 +91,72 @@ class ForagingAgent(Entity):
     def _coord_after_move(self, action):
         dx, dy = FORAGING_ACTIONS[action]
         return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
+
+    def seesResource(self):
+        """Return True if there is any resource within FRONT_SENSOR_MAX_DIST (Manhattan)
+        AND there is clear line-of-sight (no obstacle/limit/fireplace in between).
+        Uses Bresenham to check intervening cells.
+        """
+        if not getattr(self.ambient, 'resources', None):
+            return False
+        ax, ay = self.coord.x, self.coord.y
+        maxd = Conf.FRONT_SENSOR_MAX_DIST
+
+        def bresenham(x0, y0, x1, y1):
+            points = []
+            dx = abs(x1 - x0)
+            dy = abs(y1 - y0)
+            x, y = x0, y0
+            sx = 1 if x0 < x1 else -1
+            sy = 1 if y0 < y1 else -1
+            if dx > dy:
+                err = dx // 2
+                while x != x1:
+                    points.append((x, y))
+                    err -= dy
+                    if err < 0:
+                        y += sy
+                        err += dx
+                    x += sx
+                points.append((x1, y1))
+            else:
+                err = dy // 2
+                while y != y1:
+                    points.append((x, y))
+                    err -= dx
+                    if err < 0:
+                        x += sx
+                        err += dy
+                    y += sy
+                points.append((x1, y1))
+            return points
+
+        for r in self.ambient.resources:
+            rx, ry = r.getCoord().x, r.getCoord().y
+            if abs(rx - ax) + abs(ry - ay) > maxd:
+                continue
+            line = bresenham(ax, ay, rx, ry)
+            # check intermediates only
+            if len(line) <= 2:
+                intermediates = []
+            else:
+                intermediates = line[1:-1]
+            blocked = False
+            for (x, y) in intermediates:
+                c = Coord.Coord(x, y)
+                obj = self.ambient.getObject(c)
+                if obj is None:
+                    continue
+                if isinstance(obj, Obstacle):
+                    blocked = True
+                    break
+                t = getattr(obj, 'type', None)
+                if t in ("Limit", "Wall", "Fireplace"):
+                    blocked = True
+                    break
+            if not blocked:
+                return True
+        return False
 
     # --------------------------
     # ESTADO (compacto)
@@ -283,6 +353,17 @@ class ForagingAgent(Entity):
 
         if self.has_resource and self.steps_carrying > 0 and self.steps_carrying % 5 == 0:
             reward += Conf.PENALTY_5_STEPS_CARRYING
+
+        # ---------------- sensor-based visibility rewards ----------------
+        try:
+            saw_now = self.seesResource()
+        except Exception:
+            saw_now = False
+        if saw_now and (not getattr(self, 'saw_resource_prev', False)):
+            reward += Conf.VISIBILITY_GAIN
+        elif getattr(self, 'saw_resource_prev', False) and (not saw_now):
+            reward += Conf.VISIBILITY_LOSS
+        self.saw_resource_prev = saw_now
 
         # fitness
         self.fitness += reward
