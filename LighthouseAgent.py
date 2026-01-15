@@ -20,10 +20,11 @@
 #                   moveTo(Coord) : Void    ##recebe uma reward pelo movimento executado
 
 
-# Agent.py
+# LighthouseAgent.py
 import math
 import random
 import Coord
+from collections import deque
 from Entity import Entity
 from LightHouse import LightHouse
 from Obstacle import Obstacle
@@ -46,6 +47,11 @@ class Agent(Entity):
 
         self.last_state = None
         self.last_action = None
+        # posição anterior (para evitar backtracking imediato)
+        self.prev_pos = None
+        # histórico de posições para detecção de oscilações (A,B,A,B...)
+        self.pos_history = deque(maxlen=6)
+        self.oscillating = False
 
         self.ambient.agents.append(self)
         self.ambient.occupiedPositions.add(self.coord.as_tuple())
@@ -162,8 +168,10 @@ class Agent(Entity):
         state = self.get_state()
         action = choose_action(state)
 
-        self.last_state = state
-        self.last_action = action
+        # guardar estado/ação apenas se estivermos em modo Q-learning
+        if Conf.MOVE_WITH_QLEARNING:
+            self.last_state = state
+            self.last_action = action
 
         dx, dy = ACTIONS[action]
         return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
@@ -191,6 +199,11 @@ class Agent(Entity):
 
         else:
             # livre ou farol
+            # guardar posição anterior para permitir evitar backtracking em fixed
+            try:
+                self.prev_pos = self.coord.as_tuple()
+            except Exception:
+                self.prev_pos = (self.coord.x, self.coord.y)
             self.ambient.occupiedPositions.discard(self.coord.as_tuple())
             self.coord = newCoord
             self.ambient.occupiedPositions.add(self.coord.as_tuple())
@@ -205,6 +218,28 @@ class Agent(Entity):
                     reward = Conf.REWARD_STEP_CLOSER
                 else:
                     reward = Conf.REWARD_STEP_AWAY
+
+            # regista posição e detecta alternância persistente entre duas posições
+            try:
+                self.pos_history.append(self.coord.as_tuple())
+            except Exception:
+                self.pos_history.append((self.coord.x, self.coord.y))
+
+            if len(self.pos_history) >= 4:
+                positions = list(self.pos_history)
+                unique_positions = set(positions)
+                if len(unique_positions) == 2:
+                    alternates = True
+                    for i in range(2, len(positions)):
+                        if positions[i] != positions[i-2]:
+                            alternates = False
+                            break
+                    if alternates and not self.oscillating:
+                        # marcar oscilação; não aplicar reward here (we prefer to penalize selection)
+                        self.oscillating = True
+                else:
+                    if self.oscillating:
+                        self.oscillating = False
 
         self.fitness += reward
 
@@ -252,36 +287,83 @@ class Agent(Entity):
             obj = self.ambient.getObject(c)
             return (obj is None) or isinstance(obj, LightHouse)
 
-    # 1) Se houver farol visível, ir na sua direção
+        def free_neighbors_count(c):
+            # count free adjacent cells from coordinate c
+            cnt = 0
+            for dx, dy in [(0,-1),(0,1),(-1,0),(1,0)]:
+                nc = Coord.Coord(c.x + dx, c.y + dy)
+                obj = self.ambient.getObject(nc)
+                if obj is None or isinstance(obj, LightHouse):
+                    cnt += 1
+            return cnt
+
+        # 1) Se houver farol visível, ir na sua direção
         if f_type == "LightHouse" and f_dist > 0:
             c = step(front)
-            return c if is_free(c) else self.coord
+            if is_free(c):
+                self.whereIsFront = front
+                return c
+            else:
+                return self.coord
 
         if l_type == "LightHouse" and l_dist > 0:
             c = step(left)
-            return c if is_free(c) else self.coord
+            if is_free(c):
+                self.whereIsFront = left
+                return c
+            else:
+                return self.coord
 
         if r_type == "LightHouse" and r_dist > 0:
             c = step(right)
-            return c if is_free(c) else self.coord
+            if is_free(c):
+                self.whereIsFront = right
+                return c
+            else:
+                return self.coord
 
         if b_type == "LightHouse" and b_dist > 0:
             c = step(back)
-            return c if is_free(c) else self.coord
+            if is_free(c):
+                self.whereIsFront = back
+                return c
+            else:
+                return self.coord
 
-    # 2) Movimento aleatório (exploração)
+        # 2) Movimento aleatório (exploração)
         if random.random() < 0.45:
             directions = [front, left, right, back]
             random.shuffle(directions)
+            candidates = []
             for d in directions:
                 c = step(d)
                 if is_free(c):
-                    return c
+                    candidates.append((d, c))
+            if candidates:
+                # score by (manhattan distance to lighthouse, -free_neighbors) to prefer closer and with more escape routes
+                lh = self.ambient.getLightHouse().getCoord()
+                best = None
+                best_score = None
+                for d, c in candidates:
+                    try:
+                        prev = self.prev_pos
+                    except Exception:
+                        prev = None
+                    manhattan = abs(lh.x - c.x) + abs(lh.y - c.y)
+                    free_nei = free_neighbors_count(c)
+                    score = (manhattan, -free_nei)
+                    # penalize immediate backtracking slightly
+                    if prev is not None and c.as_tuple() == prev:
+                        score = (score[0] + 10, score[1])
+                    # penalize moves that continue an oscillation pattern
+                    if self.oscillating and (c.as_tuple() in set(self.pos_history)):
+                        score = (score[0] + 50, score[1])
+                if best:
+                    self.whereIsFront = best[0]
+                    return best[1]
 
-        
 
-
-    # 3) Caso contrário, usa o ângulo
+        # 3) Caso contrário, usa o ângulo
         if -45 <= angle <= 45:
             preferred = [front, left, right, back]
         elif 45 < angle <= 135:
@@ -291,15 +373,63 @@ class Agent(Entity):
         else:
             preferred = [back, left, right, front]
 
+        # Build candidates from preferred order and choose best by same scoring heuristic
+        candidates = []
         for d in preferred:
             c = step(d)
             if is_free(c):
-                return c
+                candidates.append((d, c))
+        if candidates:
+            lh = self.ambient.getLightHouse().getCoord()
+            best = None
+            best_score = None
+            for d, c in candidates:
+                try:
+                    prev = self.prev_pos
+                except Exception:
+                    prev = None
+                manhattan = abs(lh.x - c.x) + abs(lh.y - c.y)
+                free_nei = free_neighbors_count(c)
+                score = (manhattan, -free_nei)
+                if prev is not None and c.as_tuple() == prev:
+                    score = (score[0] + 10, score[1])
+                if self.oscillating and (c.as_tuple() in set(self.pos_history)):
+                    score = (score[0] + 50, score[1])
+                if best_score is None or score < best_score:
+                    best_score = score
+                    best = (d, c)
+            if best:
+                self.whereIsFront = best[0]
+                return best[1]
 
-    # 4) Fica parado se não houver alternativa
+        # 4) Fallback: escolher vizinhança que minimiza distância euclidiana ao farol (mesmo que não esteja visível)
+        best = None
+        best_dist = float('inf')
+        lh = self.ambient.getLightHouse().getCoord()
+        for d in [front, left, right, back]:
+            c = step(d)
+            if not is_free(c):
+                continue
+            dx = lh.x - c.x
+            dy = lh.y - c.y
+            dist = (dx*dx + dy*dy)
+            try:
+                prev = self.prev_pos
+            except Exception:
+                prev = None
+            if prev is not None and c.as_tuple() == prev:
+                # penalize but keep as fallback if nothing better
+                dist += 1e6
+            if self.oscillating and (c.as_tuple() in set(self.pos_history)):
+                dist += 1e6
+
+            if dist < best_dist:
+                best_dist = dist
+                best = c
+        if best is not None:
+            self.whereIsFront = (best.x - self.coord.x, best.y - self.coord.y)
+            return best
+
+        # se não houver alternativa, fica parado
         return self.coord
-
-            
-
-
 

@@ -5,7 +5,7 @@ import time
 import qlearning
 
 from LighthouseAmbient import Ambient
-from Agent import Agent
+from LighthouseAgent import Agent
 
 """
     Precisamos de importar:
