@@ -1,0 +1,113 @@
+Relatório expositivo do projeto — AA-MAS-PROJECT
+
+1. Objetivo do projecto
+
+O projeto é um simulador de agentes em grelha para dois problemas clássicos de Multi-Agent Systems (SMA):
+- Lighthouse (encontrar um farol);
+- Foraging (recolha de recursos e entrega no ninho).
+
+O sistema suporta duas abordagens de controlo dos agentes: políticas fixas heurísticas e aprendizagem por Q-learning. O código contém classes para representar ambiente, agentes,
+obstáculos, recursos, ninho e farol, além de simuladores específicos para cada problema.
+
+2. Visão geral da arquitetura
+
+O repositório está organizado por ficheiros que implementam as entidades e o simulador. Os componentes principais são:
+
+- `Coord.py` — representação de coordenadas (classe `Coord`) e utilitários de conversão (`coord_to_tuple`, `coord_to_coord`). `Coord` é uma subclasse imutável de `tuple`, com
+propriedades `.x` e `.y`, método `.as_tuple()` e operações aritméticas simples.
+
+- `Entity.py` — classe base `Entity` com atributo `coord` e métodos de acesso. Serve de superclasse para `Agent`, `Obstacle`, `LightHouse`, `Nest`, `Resource`.
+
+- `Ambient.py` — ambiente para o problema Lighthouse: mantém `grid_size`, `lighthouse`, `obstacles`, `agents`, e `occupiedPositions` (um set de posições ocupadas, em tuplos `(x,y)`).
+Inclui métodos para carregar mapas a partir de ficheiro (`from_txt`), renderização textual (`render`) e renderização gráfica com Tkinter (`init_render_window`, `render_window`). Oferece
+também `freePositions()` e `_coord_to_tuple()` para normalização de coordenadas.
+
+- `ForagingAmbient.py` — variante do ambiente para o problema de Foraging: inclui `nest`, `resources`, `picked_resources` e métodos específicos (remoção de recursos, verificação de
+recurso em posição). Mantém também render para consola e GUI.
+
+- `Agent.py` — agente para o problema Lighthouse. Implementa sensores (frente/atrás/esquerda/direita e sensor de direcção para o farol), codificação de estado (`get_state`), decisão
+(`movementChoice`, que usa Q-learning) e execução (`moveTo`, que aplica recompensa e actualiza Q-table). Também existe uma política fixa implementada em `fixedPolicyChoice`.
+
+- `ForagingAgent.py` — agente para Foraging. Implementa sensores específicos (vetor para o ninho, vetor para recurso mais próximo), estado compacto (`get_state`), escolha de acção por
+Q-learning (`movementChoice`), aplicação de acções (`apply_action`) com recompensas específicas para pick/drop e shaping, e uma política fixa (greedy por Manhattan).
+
+- `qlearning.py` — simples implementação de Q-learning baseada em tabelas (Q-tables por tarefa: `lighthouse` e `foraging`), com funções públicas:
+  - `choose_action(state, actions, banned_actions, task)` — política ε-greedy;
+  - `update_Q(state, action, reward, next_state, actions, task)` — regra de actualização Q(s,a);
+  - parâmetros configuráveis: `ALPHA`, `GAMMA`, `EPSILON`, `EPSILON_DECAY`.
+
+- `Simulator.py` e `SimulatorForaging.py` — controlam o ciclo de treino/teste de episódios para os dois problemas. Carregam mapas, inicializam agentes (posições iniciais aleatórias
+a partir de `freePositions()`), correm episódios (até `MAX_STEPS_PER_EPISODE` ou até condição de término) e agregam métricas (fitness, wins). Os simuladores também tratam da renderização
+ e do decaimento de epsilon durante treino.
+
+- Outros ficheiros auxiliares: `Obstacle.py`, `LightHouse.py`, `Nest.py`, `Resource.py`, que encapsulam funcionalidades mínimas (tipo, coord e getters).
+
+3. Políticas e métodos de aprendizagem
+
+O projeto suporta duas políticas principais por agente:
+
+A) Fixed policies (políticas fixas heurísticas)
+- Implementadas tanto em `Agent.fixedPolicyChoice` (Lighthouse) como em `ForagingAgent.fixedPolicyChoice` (Foraging).
+- Lighthouse:
+  - O agente tenta seguir o farol quando visível nos sensores (frente, esquerda, direita, trás).
+  - Caso contrário, usa uma combinação de movimento aleatório (exploração) e heurística baseada no ângulo para orientar-se numa direção preferencial (front/left/right/back) que aproxima do farol.
+- Foraging:
+  - Política greedy por Manhattan: pick ao encontrar recurso, drop ao chegar ao ninho; quando sem recurso, vai para o recurso mais próximo; quando com recurso, vai para o ninho; evita obstáculos/limites.
+
+B) Q-learning (tabela)
+- Implementado em `qlearning.py` com Q-tables separadas por tarefa (`lighthouse` e `foraging`).
+- Política de escolha: ε-greedy (função `choose_action`). Durante treino `EPSILON` decai automaticamente (função `decay_epsilon` é chamada pelo simulador) para reduzir exploração ao longo do tempo.
+- Atualização: regra de Q-learning clássica em `update_Q` com hiperparâmetros `ALPHA` e `GAMMA` fixos no ficheiro `qlearning.py`.
+- Estados e recompensas:
+  - Lighthouse: o estado do agente é uma codificação discreta dos sensores (distância e tipo do objecto identificado à frente/atrás/esquerda/direita e ângulo para o farol), conforme
+  implementado em `Agent.get_state`. Recompensas por movimento mais próximo/afastado do farol e por atingir o farol.
+  - Foraging: estado compacto em `ForagingAgent.get_state` inclui direção para o ninho, direção para o recurso mais próximo, se o agente está a carregar recurso, se está em cima
+  de recurso/ninho e bloqueios nas 4 direções. Recompensas por pick/drop, penalizações por movimentos inúteis, recheios de shaping quando aproxima/afasta do alvo.
+
+C) Quando cada política é usada
+- O modo de execução define-se em `Conf.py` (Lighthouse) e `ConfForaging.py` (Foraging) através da constante `MODE` ("fixed" ou "qlearning") e das flags `MOVE_WITH_FIXED_POLICIES` e `MOVE_WITH_QLEARNING` derivadas.
+- Durante o teste final nos simuladores, `qlearning.EPSILON` é colocado a 0.0 para avaliar a política determinística resultante do treino.
+
+4. Fluxos e condições de paragem
+
+- Lighthouse:
+  - Episódio termina quando o agente atinge exatamente a posição do farol (comparação `(agent.coord.as_tuple() == lh.as_tuple())`) — isto marca `finished_flag = True` e o simulador contabiliza como sucesso.
+  - Outros terminais: atingir `MAX_STEPS_PER_EPISODE` sem sucesso; o simulador contabiliza fitness e segue para o próximo episódio.
+
+- Foraging:
+  - Episódio de treino/teste normalmente corre um número fixo de passos (`MAX_STEPS_PER_EPISODE`), ou pode terminar quando `picked_resources` atinge `NUMBER_RESOURCES` (implementado em
+  `ForagingAgent.executar` — se `Conf.NUMBER_RESOURCES == ambient.picked_resources`, `finished_flag` é ativado para esse agente).
+  - No arranque de cada episódio, o simulador (ForagingSimulator) repovoa os recursos aleatoriamente a partir de `freePositions()`.
+
+5. Problemas resolvidos e limitações atuais
+
+- Lighthouse (problema): objetivo simples de navegação para um único agente até uma célula-alvo (farol). O projeto implementa tanto heurísticas quanto aprendizagem por Q-table para resolver a tarefa.
+  - Limitações: Q-table podem não escalar bem para ambientes maiores ou para multi-agente com interações complexas.
+
+- Foraging (problema): recolha de múltiplos recursos e devolução ao ninho.
+  - ForagingAgent implementa ações explícitas PICK e DROP (além dos movimentos 4-direction) e define recompensas e penalizações próprias. Q-learning pode aprender estratégias de recolha/entrega, enquanto a política fixa provê
+  um comportamento de referência.
+
+6. Ficheiros de configuração e parâmetros
+
+- `Conf.py` (Lighthouse): define `MODE`, ficheiros de mapa, número de episódios, passos por episódio, e recompensas/penalizações.
+- `ConfForaging.py` (Foraging): configura `MODE`, número de episódios, penalizações, recompensas por pick/drop, número de recursos e parâmetros de sensor.
+- Parâmetros de Q-learning (ALPHA, GAMMA, EPSILON, EPSILON_DECAY) estão em `qlearning.py`.
+
+7. Sugestões de evolução (priorizadas)
+
+- Normalização completa da representação de coordenadas
+   - Continuar a substituir todos os pontos do código que assumem um tipo específico, adotando `Coord.coord_to_tuple`/`coord_to_coord` nas fronteiras.
+
+- Modularização das políticas
+   - Extrair políticas fixas e Q-learning para classes/estratégias separadas com interface comum. Facilita testes A/B e extensibilidade.
+
+- Escalabilidade e estados compactos
+   - Reduzir dimensionalidade dos estados (feature engineering), usar hashing/funcion approximation (ex.: redes neurais) se se pretender escalar além de Q-tables.
+
+
+8. Conclusão
+
+O projeto dispõe de uma base funcional para estudar comportamentos de agentes em grelha nos problemas Lighthouse e Foraging, com suporte a políticas heurísticas e aprendizagem por
+Q-learning. As alterações recentes centralizaram a conversão de coordenadas e corrigiram inconsistências na política fixa do agente de foraging. Para tornar o projeto mais robusto e
+escalável, recomenda-se normalizar a API de coordenadas, modular políticas, implementar spawn inteligente e acrescentar testes automáticos.
