@@ -2,7 +2,7 @@ from Coord import Coord
 from LightHouse import LightHouse
 from LighthouseAmbient import Ambient
 from Obstacle import Obstacle
-from Agent import Agent
+from LighthouseAgent import Agent
 import qlearning
 import random
 import time
@@ -15,6 +15,13 @@ class Simulator:
         # # Init do ambiente a partir do ficheiro de mapas
         # # --------------------------
         self.ambient = Ambient.from_txt(Conf.FILE_EPISODES_INITIAL_POSITIONS)
+
+        # inicializar parâmetros de exploração (ε) a partir da config
+        import qlearning as _q
+        # Conf pode definir EXPLORATION_*; se não existir, manter defaults
+        _q.EPSILON = getattr(Conf, "EXPLORATION_INITIAL", _q.EPSILON)
+        _q.EPSILON_MIN = getattr(Conf, "EXPLORATION_FINAL", _q.EPSILON_MIN)
+        _q.EPSILON_DECAY = getattr(Conf, "EXPLORATION_DECAY", _q.EPSILON_DECAY)
 
         # cria 1 agente
         start_pos = random.choice(self.ambient.freePositions())
@@ -35,10 +42,11 @@ class Simulator:
 
         # Teste (muitos testes + render a cada passo)
         self.testar()
-        # Plot dos resultados da aprendizagem e dos testes.
-        self.plot_results()
-        
-        
+        # Plot dos resultados da aprendizagem e dos testes (omitido em fixed policy)
+        if Conf.MOVE_WITH_QLEARNING:
+            self.plot_results()
+
+
     def reset_agent_random(self, ambient, agent):
         """Reinicia o agente numa posição aleatória livre (sem reset da Q-table)."""
         ambient.occupiedPositions.discard(agent.coord.as_tuple())
@@ -88,7 +96,7 @@ class Simulator:
 
             # log de vez em quando
             if ep % 20 == 0:
-                print(f"Ep {ep:3d} | done={done} | steps={steps:2d} | fitness={fit:4d} | epsilon={qlearning.EPSILON:.3f} | Q={len(qlearning.Q_TABLES["lighthouse"])}")
+                print(f"Ep {ep:3d} | done={done} | steps={steps:2d} | fitness={fit:4d} | epsilon={qlearning.EPSILON:.3f} | Q={len(qlearning.Q_TABLES['lighthouse'])}")
 
     def testar(self):
         print("\n=== TESTE (policy aprendida) ===")
@@ -96,7 +104,7 @@ class Simulator:
         # IMPORTANTÍSSIMO: no teste queremos a política "fixa"
         qlearning.EPSILON = 0.0
 
-        N_TEST = 10
+        N_TEST = Conf.N_TEST
         MAX_STEPS_TEST = 50
 
         total_fitness = 0

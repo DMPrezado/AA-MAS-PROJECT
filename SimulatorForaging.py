@@ -11,6 +11,12 @@ class ForagingSimulator:
     def __init__(self):
         self.ambient = ForagingAmbient.from_txt(Conf.FILE_EPISODES_MAP)
 
+        # inicializar parâmetros de exploração (ε) a partir da config
+        import qlearning as _q
+        _q.EPSILON = Conf.EXPLORATION_INITIAL
+        _q.EPSILON_MIN = Conf.EXPLORATION_FINAL
+        _q.EPSILON_DECAY = Conf.EXPLORATION_DECAY
+
         start_pos = random.choice(self.ambient.freePositions())
         self.agent = ForagingAgent("F0", self.ambient, start_pos)
 
@@ -27,7 +33,11 @@ class ForagingSimulator:
         # Teste (sempre)
         self.testar()
 
-        self.plot_results()
+        # Apenas plotar resultados se estivermos em Q-learning (modo fixed não deve abrir GUI)
+        if Conf.MOVE_WITH_QLEARNING:
+            self.plot_results()
+        else:
+            print("Modo fixed: plot dos resultados omitido.")
 
     def reset_episode(self):
         self.ambient.occupiedPositions.discard(self.agent.coord.as_tuple())
@@ -53,8 +63,8 @@ class ForagingSimulator:
                 self.ambient.root.update()
                 time.sleep(delay)
             if self.agent.finished_flag:
-                break
-        return self.agent.fitness
+                return (t + 1, self.agent.fitness, True)
+        return (max_steps, self.agent.fitness, False)
 
     def treinar(self):
         print("=== TREINO FORAGING ===")
@@ -67,7 +77,12 @@ class ForagingSimulator:
             for _ in range(Conf.NUMBER_RESOURCES):
                 randPosition = random.choice(self.ambient.freePositions())
                 self.ambient.resources.append(Resource(randPosition))
-            fit = self.run_episode(
+                # garantir que o ambient conhece a posição ocupada pelo recurso
+                try:
+                    self.ambient.occupiedPositions.add(randPosition.as_tuple())
+                except Exception:
+                    self.ambient.occupiedPositions.add((randPosition.x, randPosition.y))
+            steps, fit, done = self.run_episode(
                 max_steps=Conf.MAX_STEPS_PER_EPISODE,
                 render=Conf.RENDER_DURING_TRAINING
             )
@@ -78,7 +93,7 @@ class ForagingSimulator:
             qlearning.decay_epsilon()
 
             if ep % 25 == 0:
-                print(f"Ep {ep:3d} | fitness={fit:7.1f} | epsilon={qlearning.EPSILON:.3f}")
+                print(f"Ep {ep:3d} | done={done} | steps={steps:3d} | fitness={fit:7.1f} | epsilon={qlearning.EPSILON:.3f} | Q={len(qlearning.Q_TABLES['foraging'])}")
 
     def testar(self):
         print("\n=== TESTE FORAGING (policy aprendida) ===")
@@ -86,6 +101,7 @@ class ForagingSimulator:
 
         N_TEST = 2
         total = 0
+        wins = 0
 
 
         for i in range(N_TEST):
@@ -96,14 +112,21 @@ class ForagingSimulator:
             for _ in range(Conf.NUMBER_RESOURCES):
                 randPosition = random.choice(self.ambient.freePositions())
                 self.ambient.resources.append(Resource(randPosition))
+                try:
+                    self.ambient.occupiedPositions.add(randPosition.as_tuple())
+                except Exception:
+                    self.ambient.occupiedPositions.add((randPosition.x, randPosition.y))
 
             self.ambient.init_render_window()
             print(f"\n--- TESTE {i+1}/{N_TEST} ---")
-            fit = self.run_episode(max_steps=Conf.MAX_STEPS_PER_EPISODE, render=True, delay=0.08)
+            steps, fit, done = self.run_episode(max_steps=Conf.MAX_STEPS_PER_EPISODE, render=True, delay=0.08)
             total += fit
-            print(f"Resultado: fitness={fit}")
+            if done:
+                wins += 1
+            print(f"Resultado teste {i+1}: done={done} | steps={steps} | fitness_final={fit}")
 
         print("\n=== RESUMO TESTES ===")
+        print(f"Recursos recolhidos todos em testes: {wins}/{N_TEST}")
         print(f"Fitness média: {total / N_TEST:.2f}")
 
     def plot_results(self):
