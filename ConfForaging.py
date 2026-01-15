@@ -2,8 +2,8 @@ class ConfigForaging:
     # ------------------------
     # EXECUTION MODE
     # ------------------------
-    #MODE = "qlearning"   # "fixed" | "qlearning"
-    MODE = "fixed"
+    MODE = "qlearning"   # "fixed" | "qlearning"
+    #MODE = "fixed"
     MOVE_WITH_FIXED_POLICIES = (MODE == "fixed")
     MOVE_WITH_QLEARNING     = (MODE == "qlearning")
 
