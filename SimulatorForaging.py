@@ -36,8 +36,6 @@ class ForagingSimulator:
         # Apenas plotar resultados se estivermos em Q-learning (modo fixed não deve abrir GUI)
         if Conf.MOVE_WITH_QLEARNING:
             self.plot_results()
-        else:
-            print("Modo fixed: plot dos resultados omitido.")
 
     def reset_episode(self):
         self.ambient.occupiedPositions.discard(self.agent.coord.as_tuple())

@@ -2,15 +2,16 @@ class ConfigForaging:
     # ------------------------
     # EXECUTION MODE
     # ------------------------
-    MODE = "qlearning"   # "fixed" | "qlearning"
+    #MODE = "qlearning"   # "fixed" | "qlearning"
+    MODE = "fixed"
     MOVE_WITH_FIXED_POLICIES = (MODE == "fixed")
     MOVE_WITH_QLEARNING     = (MODE == "qlearning")
 
     # ------------------------
     # MAP FILE
     # ------------------------
-    #FILE_EPISODES_MAP = "maps/foraging_map1.txt"
-    FILE_EPISODES_MAP = "maps/foraging_map_large.txt"
+    FILE_EPISODES_MAP = "maps/foraging_map1.txt"
+    #FILE_EPISODES_MAP = "maps/foraging_map_large.txt"
 
     # ------------------------
     # TRAINING
