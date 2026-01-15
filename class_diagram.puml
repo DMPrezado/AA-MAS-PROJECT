@@ -1,0 +1,215 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class Coord {
+  +__new__(cls, x, y)
+  +x: int
+  +y: int
+  +getX(): int
+  +getY(): int
+  +setX(x): Coord
+  +setY(y): Coord
+  +__eq__(other): bool
+  +__hash__(): int
+  +__repr__(): str
+  +as_tuple(): (int,int)
+  +__add__(other): Coord
+  +coord_to_tuple(coord): (int,int)
+  +coord_to_coord(coord): Coord
+}
+
+class Entity {
+  -coord
+  -movable: bool
+  -type: str
+  +__init__(coord)
+  +getCoord()
+  +isMovable()
+}
+
+class Obstacle {
+  -type: str
+  +__init__(coord, obj_type="Wall")
+  +getType()
+}
+
+class LightHouse {
+  +__init__(coord)
+}
+
+class Nest {
+  +__init__(coord)
+}
+
+class Resource {
+  -value: int
+  +__init__(coord, value=1)
+  +getCoord()
+}
+
+class Agent {
+  -name: str
+  -whereIsFront: (int,int)
+  -fitness: float
+  -finished_flag: bool
+  -last_state
+  -last_action
+  -movable: bool
+  -type: str
+  +__init__(name, ambient, pos)
+  +getObject(coord)
+  +_sense_in_direction(direction)
+  +sensorFront()
+  +sensorBack()
+  +sensorLeft()
+  +sensorRight()
+  +sensorDirection()
+  +get_state()
+  +distance_to_lighthouse()
+  +movementChoice()
+  +moveTo(newCoord)
+  +executar()
+  +fixedPolicyChoice()
+}
+
+class ForagingAgent {
+  -name: str
+  -whereIsFront: (int,int)
+  -fitness: float
+  -finished_flag: bool
+  -movable: bool
+  -has_resource: bool
+  -steps_since_pickup: int
+  -steps_carrying: int
+  -last_state
+  -last_action
+  +__init__(name, ambient, pos)
+  +sensorNestVector()
+  +sensorNearestResourceVector()
+  +_coord_after_move(action)
+  +get_state()
+  +movementChoice()
+  +apply_action(action)
+  +fixedPolicyChoice()
+  +executar()
+}
+
+class Ambient {
+  -grid_size: (width,height)
+  -lighthouse: LightHouse
+  -obstacles: List<Obstacle>
+  -agents: List[Entity]
+  -occupiedPositions: set<(x,y)>
+  -agent_spawns: List[Coord]
+  +__init__(grid_size, lighthouse=None, obstacles=None, agents=None)
+  +_rebuild_occupied()
+  +getLightHouse()
+  +getAgentsList()
+  +freePositions()
+  +_coord_to_tuple(coord)
+  +getObject(coord)
+  +render()
+  +render_window()
+  +init_render_window()
+  +_on_close()
+  +from_txt(filename)
+  +demo_map()
+}
+
+class ForagingAmbient {
+  -grid_size: (width,height)
+  -nest: Nest
+  -obstacles: List[Obstacle]
+  -resources: List[Resource]
+  -agents: List[ForagingAgent]
+  -occupiedPositions: set<(x,y)>
+  -picked_resources: int
+  -agent_spawns: List[Coord]
+  +__init__(grid_size, nest=None, obstacles=None, resources=None, agents=None)
+  +_rebuild_occupied()
+  +_coord_to_tuple(coord)
+  +getNest()
+  +freePositions()
+  +remove_resource_at(coord)
+  +getObject(coord)
+  +has_resource_at(coord)
+  +render()
+  +from_txt(filename)
+  +init_render_window()
+  +_on_close()
+  +render_window()
+}
+
+class qlearning {
+  +Q_TABLES: dict
+  +ACTIONS: dict
+  +ALPHA: float
+  +GAMMA: float
+  +EPSILON: float
+  +EPSILON_MIN: float
+  +EPSILON_DECAY: float
+  +_get_qtable(task: str)
+  +get_Q(state, action, task:str = "lighthouse")
+  +choose_action(state, actions=None, banned_actions=None, task:str = "lighthouse")
+  +update_Q(state, action, reward, next_state, actions=None, task:str = "lighthouse")
+  +decay_epsilon()
+  +reset_task(task: str)
+}
+
+class Simulator {
+  -ambient: Ambient
+  -agent: Agent
+  -FITNESS_HISTORY
+  +__init__()
+  +reset_agent_random(ambient, agent)
+  +run_episode(ambient, agent, max_steps=80, render_each_step=False, delay=0.1)
+  +treinar()
+  +testar()
+  +plot_results()
+}
+
+class ForagingSimulator {
+  -ambient: ForagingAmbient
+  -agent: ForagingAgent
+  -FITNESS_HISTORY
+  +__init__()
+  +reset_episode()
+  +run_episode(max_steps, render=False, delay=0.08)
+  +treinar()
+  +testar()
+  +plot_results()
+}
+
+' Heranças
+Entity <|-- Agent
+Entity <|-- Obstacle
+Entity <|-- LightHouse
+Entity <|-- Nest
+Entity <|-- Resource
+Entity <|-- ForagingAgent
+
+' Associações / composições (cardinalidades aproximadas)
+Ambient "1" o-- "0..*" Obstacle
+Ambient "1" o-- "0..*" Agent
+Ambient "1" o-- "0..1" LightHouse
+Ambient "1" o-- "0..*" agent_spawns : Coord list
+
+ForagingAmbient "1" o-- "0..*" Obstacle
+ForagingAmbient "1" o-- "0..*" Resource
+ForagingAmbient "1" o-- "0..*" ForagingAgent
+ForagingAmbient "1" o-- "0..1" Nest
+
+Agent "*" -- "1" Ambient : ambient
+ForagingAgent "*" -- "1" ForagingAmbient : ambient
+
+Simulator "1" o-- "1" Ambient
+Simulator "1" o-- "1" Agent
+
+ForagingSimulator "1" o-- "1" ForagingAmbient
+ForagingSimulator "1" o-- "1" ForagingAgent
+
+' Dependência ao QLearning
+Agent ..> qlearning
+ForagingAgent ..> qlearning
+
+@enduml

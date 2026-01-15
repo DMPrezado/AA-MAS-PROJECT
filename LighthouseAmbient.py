@@ -1,4 +1,4 @@
-# Ambient.py
+# LighthouseAmbient.py
 
 import Coord
 from LightHouse import LightHouse
@@ -27,6 +27,7 @@ class Ambient:
 
         for a in self.agents:
             self.occupiedPositions.add(a.getCoord().as_tuple())
+
 
 
 
@@ -63,13 +64,7 @@ class Ambient:
     # UTIL: coord -> tuple
     # --------------------------
     def _coord_to_tuple(self, coord):
-        if isinstance(coord, Coord.Coord):
-            return coord.getX(), coord.getY()
-        elif isinstance(coord, tuple):
-            return coord
-        else:
-            raise TypeError("coord deve ser Coord ou (x,y)")
-
+        return Coord.coord_to_tuple(coord)
 
 
 
@@ -217,7 +212,6 @@ class Ambient:
 
 
 
-
     # ==========================================================
     #      CRIAÇÃO DO MAPA DENTRO DO AMBIENTE
     # ==========================================================
@@ -242,9 +236,9 @@ class Ambient:
         height = len(raw_lines)
         width = len(raw_lines[0])
 
-        for line in raw_lines:
-            if len(line) != width:
-                raise ValueError("Mapa não retangular: linhas com comprimentos diferentes.")
+     #   for line in raw_lines:
+      #      if len(line) != width:
+       #         raise ValueError("Mapa não retangular: linhas com comprimentos diferentes.")
 
         obstacles = []
         lighthouse = None
@@ -291,6 +285,3 @@ class Ambient:
         ]
 
         return Ambient(grid_size=(width, height), lighthouse=lighthouse, obstacles=obstacles, agents=[])
-    
-
-

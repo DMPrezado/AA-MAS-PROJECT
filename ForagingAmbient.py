@@ -10,6 +10,7 @@ class ForagingAmbient:
         self.nest = nest
         self.obstacles = obstacles if obstacles is not None else []
         self.resources = resources if resources is not None else []
+        self.picked_resources = 0
         self.agents = agents if agents is not None else []
 
         self.occupiedPositions = set()
@@ -27,12 +28,7 @@ class ForagingAmbient:
             self.occupiedPositions.add(a.getCoord().as_tuple())
 
     def _coord_to_tuple(self, coord):
-        if isinstance(coord, Coord.Coord):
-            return coord.getX(), coord.getY()
-        elif isinstance(coord, tuple):
-            return coord
-        else:
-            raise TypeError("coord deve ser Coord ou (x,y)")
+        return Coord.coord_to_tuple(coord)
 
     def getNest(self):
         return self.nest
@@ -115,9 +111,9 @@ class ForagingAmbient:
             raise ValueError("O ficheiro do mapa está vazio.")
         height = len(raw_lines)
         width = len(raw_lines[0])
-        for line in raw_lines:
-            if len(line) != width:
-                raise ValueError("Mapa não retangular.")
+        #for line in raw_lines:
+        #    if len(line) != width:
+        #        raise ValueError("Mapa não retangular.")
         obstacles = []
         resources = []
         nest = None
@@ -129,8 +125,8 @@ class ForagingAmbient:
                     obstacles.append(Obstacle(coord, "Wall"))
                 elif ch == "F":
                     obstacles.append(Obstacle(coord, "Fireplace"))
-                elif ch == "R":
-                    resources.append(Resource(coord))
+                # elif ch == "R":
+                #     resources.append(Resource(coord))
                 elif ch == "N":
                     nest = Nest(coord)
                 elif ch == "A":
@@ -143,6 +139,7 @@ class ForagingAmbient:
             agents=[]
         )
         ambient.agent_spawns = agent_spawns
+
         return ambient
 
     # -------------------- RENDER WINDOW --------------------

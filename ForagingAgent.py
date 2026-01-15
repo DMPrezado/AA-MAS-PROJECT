@@ -1,5 +1,7 @@
+import math
 import random
 import Coord
+from collections import deque
 from Entity import Entity
 from Obstacle import Obstacle
 from Nest import Nest
@@ -42,6 +44,13 @@ class ForagingAgent(Entity):
         self.last_state = None
         self.last_action = None
 
+        # sensor de visibilidade: estado anterior (não presuponho que veja nada no início)
+        self.saw_resource_prev = False
+
+        # histórico das últimas posições para detecção de oscilação (A,B,A,B,...)
+        self.pos_history = deque(maxlen=6)
+        self.oscillating = False
+
         self.ambient.agents.append(self)
         self.ambient.occupiedPositions.add(self.coord.as_tuple())
 
@@ -57,23 +66,97 @@ class ForagingAgent(Entity):
         return (n.x - self.coord.x, n.y - self.coord.y)
 
     def sensorNearestResourceVector(self):
-        """(dx,dy) para o recurso mais próximo (Manhattan). Se não houver, (0,0)."""
+        """(dx, dy) para o recurso mais próximo (Manhattan). Se não houver, (0, 0)."""
         if not self.ambient.resources:
             return (0, 0)
-        ax, ay = self.coord.x, self.coord.y
-        best_dx, best_dy = 0, 0
-        best_d = 10**9
-        for r in self.ambient.resources:
-            rx, ry = r.getCoord().x, r.getCoord().y
-            d = abs(rx - ax) + abs(ry - ay)
-            if d < best_d:
-                best_d = d
-                best_dx, best_dy = (rx - ax), (ry - ay)
-        return (best_dx, best_dy)
+
+        agent_x, agent_y = self.coord.x, self.coord.y
+        closest_dx, closest_dy = 0, 0
+        min_distance = float("inf")
+
+        for resource in self.ambient.resources:
+            resource_x = resource.getCoord().x
+            resource_y = resource.getCoord().y
+
+            distance = abs(resource_x - agent_x) + abs(resource_y - agent_y)
+
+            if distance < min_distance:
+                min_distance = distance
+                closest_dx = resource_x - agent_x
+                closest_dy = resource_y - agent_y
+
+        return (closest_dx, closest_dy)
+
 
     def _coord_after_move(self, action):
         dx, dy = FORAGING_ACTIONS[action]
         return Coord.Coord(self.coord.x + dx, self.coord.y + dy)
+
+    def seesResource(self):
+        """Return True if there is any resource within FRONT_SENSOR_MAX_DIST (Manhattan)
+        AND there is clear line-of-sight (no obstacle/limit/fireplace in between).
+        Uses Bresenham to check intervening cells.
+        """
+        if not getattr(self.ambient, 'resources', None):
+            return False
+        ax, ay = self.coord.x, self.coord.y
+        maxd = Conf.FRONT_SENSOR_MAX_DIST
+
+        def bresenham(x0, y0, x1, y1):
+            points = []
+            dx = abs(x1 - x0)
+            dy = abs(y1 - y0)
+            x, y = x0, y0
+            sx = 1 if x0 < x1 else -1
+            sy = 1 if y0 < y1 else -1
+            if dx > dy:
+                err = dx // 2
+                while x != x1:
+                    points.append((x, y))
+                    err -= dy
+                    if err < 0:
+                        y += sy
+                        err += dx
+                    x += sx
+                points.append((x1, y1))
+            else:
+                err = dy // 2
+                while y != y1:
+                    points.append((x, y))
+                    err -= dx
+                    if err < 0:
+                        x += sx
+                        err += dy
+                    y += sy
+                points.append((x1, y1))
+            return points
+
+        for r in self.ambient.resources:
+            rx, ry = r.getCoord().x, r.getCoord().y
+            if abs(rx - ax) + abs(ry - ay) > maxd:
+                continue
+            line = bresenham(ax, ay, rx, ry)
+            # check intermediates only
+            if len(line) <= 2:
+                intermediates = []
+            else:
+                intermediates = line[1:-1]
+            blocked = False
+            for (x, y) in intermediates:
+                c = Coord.Coord(x, y)
+                obj = self.ambient.getObject(c)
+                if obj is None:
+                    continue
+                if isinstance(obj, Obstacle):
+                    blocked = True
+                    break
+                t = getattr(obj, 'type', None)
+                if t in ("Limit", "Wall", "Fireplace"):
+                    blocked = True
+                    break
+            if not blocked:
+                return True
+        return False
 
     # --------------------------
     # ESTADO (compacto)
@@ -121,13 +204,25 @@ class ForagingAgent(Entity):
 
     def movementChoice(self):
         state = self.get_state()
+        # definir ações banidas: não permitir PICK se não houver recurso aqui; não permitir DROP se não estivermos no ninho ou não tiver recurso
+        banned = set()
+        if not self.ambient.has_resource_at(self.coord):
+            banned.add(PICK_ACTION)
+        here = self.ambient.getObject(self.coord)
+        if not (self.has_resource and isinstance(here, Nest)):
+            # se não estamos no ninho com recurso, banir DROP
+            banned.add(DROP_ACTION)
+
         action = choose_action(
             state,
             actions=list(FORAGING_ACTIONS.keys()),
+            banned_actions=banned,
             task="foraging"
         )
-        self.last_state = state
-        self.last_action = action
+        # guardar estado/ação apenas se estivermos em Q-learning
+        if Conf.MOVE_WITH_QLEARNING:
+            self.last_state = state
+            self.last_action = action
         return action
 
     # --------------------------
@@ -192,6 +287,34 @@ class ForagingAgent(Entity):
                 elif new_d > old_d:
                     reward += Conf.REWARD_MOVE_AWAY_TARGET
 
+                # registar posição no histórico e detetar oscilações (A,B,A,B,...)
+                try:
+                    self.pos_history.append(self.coord.as_tuple())
+                except Exception:
+                    self.pos_history.append((self.coord.x, self.coord.y))
+
+                # detectar alternância repetida entre duas posições
+                if len(self.pos_history) >= 4:
+                    positions = list(self.pos_history)
+                    unique_positions = set(positions)
+                    if len(unique_positions) == 2:
+                        alternates = True
+                        for i in range(2, len(positions)):
+                            if positions[i] != positions[i-2]:
+                                alternates = False
+                                break
+                        if alternates and (not self.oscillating):
+                            reward += Conf.PENALTY_REPEAT_MOVE
+                            self.oscillating = True
+                    else:
+                        # se já não alterna entre duas posições, sair do estado de oscilação
+                        if self.oscillating:
+                            self.oscillating = False
+            else:
+                # se o movimento não foi bem sucedido, limpar histórico e flag de oscilação
+                self.pos_history.clear()
+                self.oscillating = False
+
         # ---------------- PICK ----------------
         elif action == PICK_ACTION:
             if (not self.has_resource) and self.ambient.has_resource_at(self.coord):
@@ -201,6 +324,9 @@ class ForagingAgent(Entity):
                     self.steps_since_pickup = 0
                     self.steps_carrying = 0
                     reward += Conf.REWARD_PICK_RESOURCE
+                    # ao apanhar recurso, reset do histórico de posições e flag
+                    self.pos_history.clear()
+                    self.oscillating = False
                 else:
                     reward += Conf.REWARD_INVALID_PICK
             else:
@@ -214,6 +340,10 @@ class ForagingAgent(Entity):
                 self.has_resource = False
                 self.steps_carrying = 0
                 reward += Conf.REWARD_DROP_IN_NEST
+                self.ambient.picked_resources += 1
+                # ao dropar no ninho, reset do histórico de posições e flag
+                self.pos_history.clear()
+                self.oscillating = False
             else:
                 reward += Conf.REWARD_INVALID_DROP
 
@@ -224,11 +354,22 @@ class ForagingAgent(Entity):
         if self.has_resource and self.steps_carrying > 0 and self.steps_carrying % 5 == 0:
             reward += Conf.PENALTY_5_STEPS_CARRYING
 
+        # ---------------- sensor-based visibility rewards ----------------
+        try:
+            saw_now = self.seesResource()
+        except Exception:
+            saw_now = False
+        if saw_now and (not getattr(self, 'saw_resource_prev', False)):
+            reward += Conf.VISIBILITY_GAIN
+        elif getattr(self, 'saw_resource_prev', False) and (not saw_now):
+            reward += Conf.VISIBILITY_LOSS
+        self.saw_resource_prev = saw_now
+
         # fitness
         self.fitness += reward
 
-        # update Q
-        if self.last_state is not None and self.last_action is not None:
+        # update Q (apenas se estivermos em Q-learning)
+        if Conf.MOVE_WITH_QLEARNING and self.last_state is not None and self.last_action is not None:
             next_state = self.get_state()
             update_Q(
                 self.last_state,
@@ -245,7 +386,7 @@ class ForagingAgent(Entity):
 
     def fixedPolicyChoice(self):
         """
-        Política fixa:
+        Política fixa (greedy/manhattan):
         1) Se estiver em cima de recurso e não tiver -> PICK
         2) Se estiver no ninho e tiver -> DROP
         3) Caso contrário:
@@ -304,7 +445,7 @@ class ForagingAgent(Entity):
                 return t in ("Wall", "Fireplace", "Limit")
             return False
 
-            # 4) Greedy: escolhe o move que minimiza distância Manhattan ao alvo
+        # 4) Greedy: escolhe o move que minimiza distância Manhattan ao alvo
         best_actions = []
         best_dist = 10**9
 
@@ -333,21 +474,19 @@ class ForagingAgent(Entity):
 
         # 6) se estiver encurralado total, não mexe (mas como só temos 0..5, devolve um move)
         return random.choice([0, 1, 2, 3])
-    
 
 
     def executar(self):
+        if Conf.NUMBER_RESOURCES == self.ambient.picked_resources:
+            self.finished_flag = True
+            return
         if Conf.MOVE_WITH_QLEARNING:
             action = self.movementChoice()
         elif Conf.MOVE_WITH_FIXED_POLICIES:
             action = self.fixedPolicyChoice()
             # para o fixed também faz sentido guardar isto (assim apply_action pode atualizar Q se quiseres)
-            self.last_state = self.get_state()
-            self.last_action = action
+            # nota: não guardamos last_state/last_action quando estamos em fixed — update_Q está condicionado a Conf.MOVE_WITH_QLEARNING
         else:
             raise ValueError("Config inválida em ConfForaging.py")
 
         self.apply_action(action)
-
-
-

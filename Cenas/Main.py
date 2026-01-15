@@ -4,8 +4,8 @@ import random
 import time
 import qlearning
 
-from Ambient import Ambient
-from Agent import Agent
+from LighthouseAmbient import Ambient
+from LighthouseAgent import Agent
 
 """
     Precisamos de importar:
