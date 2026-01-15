@@ -7,22 +7,29 @@ import qlearning
 import random
 import time
 from ConfLighthouse import ConfigLightHouse as Conf
+
+# --- NOVO: heatmap ---
 import numpy as np
 import matplotlib.pyplot as plt
 
-class SimulatorLighthouse:
+
+class Simulator:
     def __init__(self):
-        # # --------------------------
-        # # Init do ambiente a partir do ficheiro de mapas
-        # # --------------------------
+        # --------------------------
+        # Init do ambiente a partir do ficheiro de mapas
+        # --------------------------
         self.ambient = Ambient.from_txt(Conf.FILE_EPISODES_INITIAL_POSITIONS)
 
+        # inicializar parâmetros de exploração (ε) a partir da config
+        import qlearning as _q
+        # Conf pode definir EXPLORATION_*; se não existir, manter defaults
+        _q.EPSILON = getattr(Conf, "EXPLORATION_INITIAL", _q.EPSILON)
+        _q.EPSILON_MIN = getattr(Conf, "EXPLORATION_FINAL", _q.EPSILON_MIN)
+        _q.EPSILON_DECAY = getattr(Conf, "EXPLORATION_DECAY", _q.EPSILON_DECAY)
 
+        # --- NOVO: matriz de visitas (heatmap) ---
         w, h = self.ambient.grid_size
         self.HEATMAP_VISITS = np.zeros((h, w), dtype=int)  # [y][x]
-
-
-
 
         # cria 1 agente
         start_pos = random.choice(self.ambient.freePositions())
@@ -30,24 +37,25 @@ class SimulatorLighthouse:
 
         self.FITNESS_HISTORY = []
 
+        # --------------------------
+        # Treino / Teste / Plot
+        # --------------------------
+        # Só treina se estiver em Q-learning
+        if Conf.MOVE_WITH_QLEARNING:
+            self.treinar()
+        else:
+            print("=== FIXED POLICY: sem treino ===")
+            qlearning.EPSILON = 0.0
 
-        # --------------------------
-        # 1) TREINO
-        # --------------------------
-        self.treinar()
-        # --------------------------
-        # 2) TESTE (muitos testes + render a cada passo)
-        # --------------------------
+        # Teste (muitos testes + render a cada passo)
         self.testar()
-        # --------------------------
-        # 3) Plot dos resultados da aprendizagem e dos testes.
-        # --------------------------
-        #TODO: implementar plotagem dos resultados
-        self.plot_results()
-        
 
-        self.plot_heatmap()
-        
+        # Plot dos resultados da aprendizagem e dos testes (omitido em fixed policy)
+        if Conf.MOVE_WITH_QLEARNING:
+            self.plot_results()
+            self.plot_heatmap()   # --- NOVO: mostrar heatmap no fim ---
+
+
     def reset_agent_random(self, ambient, agent):
         """Reinicia o agente numa posição aleatória livre (sem reset da Q-table)."""
         ambient.occupiedPositions.discard(agent.coord.as_tuple())
@@ -59,22 +67,21 @@ class SimulatorLighthouse:
         agent.prev_pos = None
         agent.fitness = 0
 
+
+    # --- ALTERADO: run_episode recebe heatmap e conta visitas ---
     def run_episode(self, ambient, agent, max_steps=80, render_each_step=False, delay=0.1, heatmap=None):
         for t in range(max_steps):
             agent.executar()
 
-            # contar visita (após executar o passo)
+            # --- HEATMAP: contar visita (depois do passo) ---
             if heatmap is not None:
                 heatmap[agent.coord.y, agent.coord.x] += 1
-
-
 
             if render_each_step and hasattr(self.ambient, "root") and self.ambient.root.winfo_exists():
                 self.ambient.render_window()
                 self.ambient.root.update_idletasks()
                 self.ambient.root.update()
                 time.sleep(delay)
-
 
             if agent.finished_flag:
                 return (t + 1, agent.fitness, True)
@@ -95,7 +102,7 @@ class SimulatorLighthouse:
                 render_each_step=Conf.RENDER_DURING_TRAINING
             )
 
-            ##Guardar Fitness
+            # Guardar Fitness
             self.FITNESS_HISTORY.append(fit)
 
             # decair exploração
@@ -103,15 +110,22 @@ class SimulatorLighthouse:
 
             # log de vez em quando
             if ep % 20 == 0:
-                print(f"Ep {ep:3d} | done={done} | steps={steps:2d} | fitness={fit:4d} | epsilon={qlearning.EPSILON:.3f} | Q={len(qlearning.Q_TABLES["lighthouse"])}")
+                print(
+                    f"Ep {ep:3d} | done={done} | steps={steps:2d} | fitness={fit:4d} | "
+                    f"epsilon={qlearning.EPSILON:.3f} | Q={len(qlearning.Q_TABLES['lighthouse'])}"
+                )
+
 
     def testar(self):
         print("\n=== TESTE (policy aprendida) ===")
 
-        # IMPORTANTÍSSIMO: no teste queremos a política "fixa"
+        # no teste queremos a política greedy
         qlearning.EPSILON = 0.0
 
-        N_TEST = 10
+        # --- NOVO: reset heatmap para ser só dos testes ---
+        self.HEATMAP_VISITS.fill(0)
+
+        N_TEST = Conf.N_TEST
         MAX_STEPS_TEST = 50
 
         total_fitness = 0
@@ -123,14 +137,12 @@ class SimulatorLighthouse:
             self.reset_agent_random(self.ambient, self.agent)
 
             print(f"\n--- TESTE {test_i+1}/{N_TEST} ---")
-            # print("Estado inicial:")
-            # print(self.ambient.render())
             steps, fit, done = self.run_episode(
                 self.ambient, self.agent,
                 max_steps=MAX_STEPS_TEST,
                 render_each_step=True,
                 delay=0.10,
-                heatmap=self.HEATMAP_VISITS
+                heatmap=self.HEATMAP_VISITS  # --- NOVO: contar visitas ---
             )
 
             total_fitness += fit
@@ -144,44 +156,39 @@ class SimulatorLighthouse:
 
 
     def plot_results(self):
-        import matplotlib.pyplot as plt
-
+        plt.figure()
         plt.plot(self.FITNESS_HISTORY)
-        plt.title("Fitness ao longo dos episódios de treino")
+        plt.title("Lighthouse: Fitness ao longo dos episódios de treino")
         plt.xlabel("Episódio")
         plt.ylabel("Fitness")
         plt.grid()
         plt.show()
 
+
+    # --- NOVO: heatmap com obstáculos a preto ---
     def plot_heatmap(self):
         visits = self.HEATMAP_VISITS.copy()
-        h, w = visits.shape
 
-        # Base: heatmap normal
         plt.figure()
         plt.title("Heatmap de visitas (TESTE) – Lighthouse")
         plt.xlabel("x")
         plt.ylabel("y")
 
-        # Heatmap das visitas
+        # Heatmap base
         plt.imshow(visits, origin="upper")
         plt.colorbar(label="Nº de visitas")
 
-        # --------- DESENHAR OBSTÁCULOS A PRETO ---------
+        # Obstáculos a preto (Wall/Fireplace/Limit etc.)
         for o in self.ambient.obstacles:
             x, y = o.getCoord().x, o.getCoord().y
             plt.scatter(x, y, marker="s", s=300, c="black")
 
-        # --------- DESENHAR FAROL ---------
+        # Farol (objetivo)
         lh = self.ambient.getLightHouse().getCoord()
         plt.scatter(lh.x, lh.y, marker="*", s=250)
 
         plt.show()
 
-    
-
-
-
 
 if __name__ == "__main__":
-    SimulatorLighthouse()
+    Simulator()
