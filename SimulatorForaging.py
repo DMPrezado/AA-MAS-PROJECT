@@ -110,7 +110,7 @@ class ForagingSimulator:
         import matplotlib.pyplot as plt
 
         plt.plot(self.FITNESS_HISTORY)
-        plt.title("Fitness ao longo dos episódios de treino")
+        plt.title("Foraging: Fitness ao longo dos episódios de treino")
         plt.xlabel("Episódio")
         plt.ylabel("Fitness")
         plt.grid()
