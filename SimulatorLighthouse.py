@@ -36,7 +36,6 @@ class Simulator:
         # Teste (muitos testes + render a cada passo)
         self.testar()
         # Plot dos resultados da aprendizagem e dos testes.
-        # TODO: implementar plotagem dos resultados
         self.plot_results()
         
         
@@ -132,7 +131,7 @@ class Simulator:
         import matplotlib.pyplot as plt
 
         plt.plot(self.FITNESS_HISTORY)
-        plt.title("Fitness ao longo dos episódios de treino")
+        plt.title("Lighthouse: Fitness ao longo dos episódios de treino")
         plt.xlabel("Episódio")
         plt.ylabel("Fitness")
         plt.grid()

@@ -236,9 +236,9 @@ class Ambient:
         height = len(raw_lines)
         width = len(raw_lines[0])
 
-        for line in raw_lines:
-            if len(line) != width:
-                raise ValueError("Mapa não retangular: linhas com comprimentos diferentes.")
+     #   for line in raw_lines:
+      #      if len(line) != width:
+       #         raise ValueError("Mapa não retangular: linhas com comprimentos diferentes.")
 
         obstacles = []
         lighthouse = None
