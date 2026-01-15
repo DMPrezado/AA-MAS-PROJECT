@@ -10,7 +10,7 @@ class ConfigForaging:
     # ------------------------
     # MAP FILE
     # ------------------------
-    FILE_EPISODES_MAP = "maps/foraging_map_large.txt"
+    FILE_EPISODES_MAP = "maps/foraging_map1.txt"
     #FILE_EPISODES_MAP = "maps/foraging_map_large.txt"
 
     # ------------------------
